@@ -1,0 +1,348 @@
+import { create } from 'zustand';
+import {
+  addEdge as reactFlowAddEdge,
+  applyEdgeChanges,
+  applyNodeChanges,
+} from 'reactflow';
+import type { Connection, Edge, EdgeChange, Node, NodeChange } from 'reactflow';
+import { v4 as uuidv4 } from 'uuid';
+import type { AlignmentDirection, DiagramSnapshot, DiagramStore } from '../types';
+import {
+  DECISION_SOURCE_HANDLES,
+  getDecisionLabelForHandle,
+  isDecisionSourceHandle,
+} from '../nodes/decisionHandles';
+import type { NodeData } from '../nodes/types';
+import { getDefaultNodeData } from '../nodes/nodeRegistry';
+import { alignNodes as alignDiagramNodes } from '../utils/alignment';
+import {
+  DEFAULT_NODE_SIZE,
+  DUPLICATE_OFFSET,
+  cloneEdge,
+  cloneNode,
+  initialNodes,
+} from './store.utils';
+
+function createDuplicateNode(
+  node: Node<NodeData>,
+  offset: { x: number; y: number },
+): Node<NodeData> {
+  return {
+    ...cloneNode(node),
+    id: uuidv4(),
+    position: {
+      x: node.position.x + offset.x,
+      y: node.position.y + offset.y,
+    },
+    selected: true,
+  };
+}
+
+const DECISION_HANDLE_PRIORITY = [
+  DECISION_SOURCE_HANDLES.yes,
+  DECISION_SOURCE_HANDLES.no,
+] as const;
+
+function resolveDecisionSourceHandle(
+  sourceHandle: Connection['sourceHandle'],
+  outgoingEdges: Edge[],
+) {
+  if (isDecisionSourceHandle(sourceHandle)) {
+    return sourceHandle;
+  }
+
+  const usedHandles = new Set(
+    outgoingEdges
+      .map((edge) => edge.sourceHandle)
+      .filter(isDecisionSourceHandle),
+  );
+
+  return DECISION_HANDLE_PRIORITY.find((handleId) => !usedHandles.has(handleId)) ?? null;
+}
+
+const useDiagramStore = create<DiagramStore>()((set, get) => ({
+  nodes: initialNodes,
+  edges: [],
+  diagramId: null,
+  isSaving: false,
+
+  onNodesChange: (changes: NodeChange[]) => {
+    set({
+      nodes: applyNodeChanges(changes, get().nodes),
+    });
+  },
+
+  onEdgesChange: (changes: EdgeChange[]) => {
+    set({
+      edges: applyEdgeChanges(changes, get().edges),
+    });
+  },
+
+  onConnect: (params: Connection) => {
+    if (!params.source || !params.target) {
+      return false;
+    }
+
+    const { nodes, edges } = get();
+    const sourceNode = nodes.find((node) => node.id === params.source);
+    const sourceColor = sourceNode?.data?.color ?? null;
+
+    if (sourceNode?.type === 'decision') {
+      const decisionOutgoingEdges = edges.filter(
+        (edge) => edge.source === params.source && isDecisionSourceHandle(edge.sourceHandle),
+      );
+      const sourceHandle = resolveDecisionSourceHandle(
+        params.sourceHandle,
+        decisionOutgoingEdges,
+      );
+
+      if (!sourceHandle) {
+        return false;
+      }
+
+      const handleOutgoingEdges = edges.filter(
+        (edge) => edge.source === params.source && edge.sourceHandle === sourceHandle,
+      );
+
+      if (
+        decisionOutgoingEdges.length >= DECISION_HANDLE_PRIORITY.length ||
+        handleOutgoingEdges.length > 0
+      ) {
+        return false;
+      }
+
+      const edgeWithData: Edge = {
+        id: `e-${params.source}-${params.target}-${uuidv4()}`,
+        source: params.source,
+        target: params.target,
+        sourceHandle,
+        targetHandle: params.targetHandle,
+        type: 'labeled',
+        data: { label: getDecisionLabelForHandle(sourceHandle), sourceColor },
+      };
+
+      set({
+        edges: reactFlowAddEdge(edgeWithData, edges),
+      });
+      return true;
+    }
+
+    const defaultEdge: Edge = {
+      id: `e-${params.source}-${params.target}-${uuidv4()}`,
+      source: params.source,
+      target: params.target,
+      sourceHandle: params.sourceHandle,
+      targetHandle: params.targetHandle,
+      type: 'labeled',
+      data: { sourceColor },
+    };
+
+    set({
+      edges: reactFlowAddEdge(defaultEdge, edges),
+    });
+    return true;
+  },
+
+  addNode: (node) => {
+    set({ nodes: [...get().nodes, node] });
+  },
+
+  addEdge: (edge) => {
+    set({
+      edges: reactFlowAddEdge(edge, get().edges),
+    });
+  },
+
+  updateNode: (nodeId, data) => {
+    set({
+      nodes: get().nodes.map((node) =>
+        node.id === nodeId ? { ...node, data: { ...node.data, ...data } } : node,
+      ),
+    });
+  },
+
+  updateNodeDimensions: (nodeId, dimensions) => {
+    set({
+      nodes: get().nodes.map((node) => {
+        if (node.id !== nodeId) {
+          return node;
+        }
+
+        const width = Math.round(dimensions.width);
+        const height = Math.round(dimensions.height);
+
+        return {
+          ...node,
+          width,
+          height,
+          position: {
+            x: dimensions.x ?? node.position.x,
+            y: dimensions.y ?? node.position.y,
+          },
+          data: {
+            ...node.data,
+            width,
+            height,
+          },
+        };
+      }),
+    });
+  },
+
+  updateNodeColor: (nodeId, color) => {
+    set({
+      nodes: get().nodes.map((node) =>
+        node.id === nodeId ? { ...node, data: { ...node.data, color } } : node,
+      ),
+    });
+  },
+
+  updateNodeType: (nodeId, type) => {
+    set({
+      nodes: get().nodes.map((node) => {
+        if (node.id !== nodeId) {
+          return node;
+        }
+
+        const defaults = getDefaultNodeData(type);
+        const width = node.data.width ?? defaults.width ?? DEFAULT_NODE_SIZE.width;
+        const height = node.data.height ?? defaults.height ?? DEFAULT_NODE_SIZE.height;
+
+        return {
+          ...node,
+          type,
+          width,
+          height,
+          data: {
+            ...node.data,
+            ...defaults,
+            width,
+            height,
+          },
+        };
+      }),
+    });
+  },
+
+  updateEdgeData: (edgeId, label) => {
+    set({
+      edges: get().edges.map((edge) =>
+        edge.id === edgeId ? { ...edge, data: { ...edge.data, label } } : edge,
+      ),
+    });
+  },
+
+  deleteNodesAndEdges: (nodeIds, edgeIds) => {
+    if (nodeIds.length === 0 && edgeIds.length === 0) {
+      return;
+    }
+
+    set({
+      nodes: get().nodes.filter((node) => !nodeIds.includes(node.id)),
+      edges: get().edges.filter(
+        (edge) =>
+          !edgeIds.includes(edge.id) &&
+          !nodeIds.includes(edge.source) &&
+          !nodeIds.includes(edge.target),
+      ),
+    });
+  },
+
+  duplicateNodesAndEdges: (nodeIds, options) => {
+    if (nodeIds.length === 0) {
+      return { newNodeIds: [] };
+    }
+
+    const { nodes, edges } = get();
+    const offset = options?.offset ?? { x: DUPLICATE_OFFSET, y: DUPLICATE_OFFSET };
+    const selectedNodes = nodes.filter((node) => nodeIds.includes(node.id));
+    const duplicates = selectedNodes.map((node) => createDuplicateNode(node, offset));
+    const idMap = new Map<string, string>();
+
+    selectedNodes.forEach((node, index) => {
+      idMap.set(node.id, duplicates[index].id);
+    });
+
+    const duplicateEdges = edges
+      .filter((edge) => nodeIds.includes(edge.source) && nodeIds.includes(edge.target))
+      .map((edge) => ({
+        ...cloneEdge(edge),
+        id: uuidv4(),
+        source: idMap.get(edge.source) ?? edge.source,
+        target: idMap.get(edge.target) ?? edge.target,
+        selected: false,
+      }));
+
+    set({
+      nodes: [...nodes.map((node) => ({ ...node, selected: false })), ...duplicates],
+      edges: [...edges.map((edge) => ({ ...edge, selected: false })), ...duplicateEdges],
+    });
+
+    return { newNodeIds: duplicates.map((node) => node.id) };
+  },
+
+  alignNodes: (nodeIds, direction) => {
+    if (nodeIds.length < 2) {
+      return;
+    }
+
+    const selected = get().nodes.filter((node) =>
+      nodeIds.includes(node.id),
+    ) as Node<NodeData>[];
+    const aligned = alignDiagramNodes(selected, direction as AlignmentDirection);
+    const alignedMap = new Map(aligned.map((node) => [node.id, node]));
+
+    set({
+      nodes: get().nodes.map((node) => alignedMap.get(node.id) ?? node),
+    });
+  },
+
+  nudgeNodes: (nodeIds, dx, dy) => {
+    if (nodeIds.length === 0) {
+      return;
+    }
+
+    set({
+      nodes: get().nodes.map((node) =>
+        nodeIds.includes(node.id)
+          ? {
+              ...node,
+              position: {
+                x: node.position.x + dx,
+                y: node.position.y + dy,
+              },
+            }
+          : node,
+      ),
+    });
+  },
+
+  setDiagramId: (diagramId) => set({ diagramId }),
+
+  setDiagram: (nodes, edges) =>
+    set({
+      nodes,
+      edges,
+    }),
+
+  replaceFromSnapshot: (snapshot: DiagramSnapshot) =>
+    set({
+      nodes: snapshot.nodes.map(cloneNode),
+      edges: snapshot.edges.map(cloneEdge),
+    }),
+
+  createSnapshot: () => ({
+    nodes: get().nodes.map(cloneNode),
+    edges: get().edges.map(cloneEdge),
+  }),
+
+  setSaving: (isSaving) => set({ isSaving }),
+
+  clearDiagram: () =>
+    set({
+      nodes: [],
+      edges: [],
+    }),
+}));
+
+export default useDiagramStore;

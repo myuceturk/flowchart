@@ -1,0 +1,89 @@
+.edge-label {
+  background: rgba(30, 30, 46, 0.85);
+  backdrop-filter: blur(4px);
+  color: #ffffff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  pointer-events: all;
+  user-select: none;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition:
+    transform var(--motion-duration-fast) var(--motion-easing-standard),
+    background-color var(--motion-duration-fast) var(--motion-easing-standard),
+    box-shadow var(--motion-duration-fast) var(--motion-easing-standard),
+    border-color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.edge-path,
+.react-flow__edge-path {
+  stroke: var(--theme-edge-color, #475569);
+  stroke-width: 2.5;
+  transition:
+    stroke var(--motion-duration-normal) var(--motion-easing-standard),
+    stroke-width var(--motion-duration-normal) var(--motion-easing-standard),
+    filter var(--motion-duration-normal) var(--motion-easing-standard);
+  cursor: pointer;
+  will-change: stroke, stroke-width, filter;
+}
+
+.react-flow__edge:hover .edge-path,
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: #6366f1 !important;
+  stroke-width: 3.5 !important;
+  filter: drop-shadow(0 0 6px rgba(99, 102, 241, 0.28));
+}
+
+.react-flow__edge.selected .edge-path,
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #6366f1 !important;
+  stroke-width: 4 !important;
+  filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.34));
+}
+
+.react-flow__edge.selected .edge-label {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4);
+}
+
+.edge-label:hover {
+  background: rgba(30, 30, 46, 1);
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.edge-path--animated {
+  stroke-dasharray: 8 6;
+  animation: edge-flow 1.4s linear infinite;
+}
+
+@keyframes edge-flow {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+
+/* Ghost edge while dragging a new connection */
+.react-flow__connection-path {
+  stroke: var(--theme-primary, #6366f1) !important;
+  stroke-width: 2 !important;
+  stroke-dasharray: 6 4;
+  animation: edge-flow 1s linear infinite;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .edge-path--animated,
+  .react-flow__connection-path {
+    animation: none !important;
+  }
+
+  .react-flow__edge-path {
+    animation: none !important;
+  }
+}

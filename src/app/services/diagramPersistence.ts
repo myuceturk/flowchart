@@ -1,0 +1,84 @@
+import type { Edge, Node } from 'reactflow';
+import type { NodeData } from '../../nodes/types';
+
+export const DIAGRAM_AUTOSAVE_STORAGE_KEY = 'flow-diagram-autosave';
+
+const DIAGRAM_API_BASE_URL = 'http://localhost:3001';
+
+export type DiagramPayload = {
+  id?: string;
+  nodes: Node<NodeData>[];
+  edges: Edge[];
+};
+
+export async function loadDiagramFromApi(id: string): Promise<DiagramPayload | null> {
+  const response = await fetch(`${DIAGRAM_API_BASE_URL}/diagram/${id}`);
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const data = (await response.json()) as Partial<DiagramPayload>;
+
+  return {
+    id: data.id ?? id,
+    nodes: (data.nodes ?? []) as Node<NodeData>[],
+    edges: data.edges ?? [],
+  };
+}
+
+export async function saveDiagramToApi(
+  payload: Pick<DiagramPayload, 'id' | 'nodes' | 'edges'>,
+): Promise<{ id: string; created: boolean }> {
+  const isUpdate = Boolean(payload.id);
+  const response = await fetch(
+    isUpdate
+      ? `${DIAGRAM_API_BASE_URL}/diagram/${payload.id}`
+      : `${DIAGRAM_API_BASE_URL}/diagram`,
+    {
+      method: isUpdate ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nodes: payload.nodes,
+        edges: payload.edges,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(isUpdate ? 'Failed to update diagram' : 'Failed to create diagram');
+  }
+
+  if (isUpdate) {
+    return { id: payload.id as string, created: false };
+  }
+
+  const data = (await response.json()) as { id: string };
+  return { id: data.id, created: true };
+}
+
+export function loadAutosavedDiagram(): Pick<DiagramPayload, 'nodes' | 'edges'> | null {
+  const savedData = window.localStorage.getItem(DIAGRAM_AUTOSAVE_STORAGE_KEY);
+
+  if (!savedData) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(savedData) as Partial<DiagramPayload>;
+    return {
+      nodes: (parsed.nodes ?? []) as Node<NodeData>[],
+      edges: parsed.edges ?? [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function saveAutosavedDiagram(payload: Pick<DiagramPayload, 'nodes' | 'edges'>) {
+  window.localStorage.setItem(DIAGRAM_AUTOSAVE_STORAGE_KEY, JSON.stringify(payload));
+}
+
+export function clearAutosavedDiagram() {
+  window.localStorage.removeItem(DIAGRAM_AUTOSAVE_STORAGE_KEY);
+}

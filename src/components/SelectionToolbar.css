@@ -1,0 +1,90 @@
+.selection-toolbar-hint {
+  margin-top: 10px;
+}
+
+.hint-container {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  max-width: min(960px, calc(100vw - 40px));
+  background: var(--theme-selection-bg);
+  color: var(--theme-selection-text);
+  padding: 8px 14px;
+  border-radius: 22px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.22), 0 0 0 1px color-mix(in srgb, var(--theme-border) 88%, transparent);
+  border: 1px solid var(--theme-border);
+  backdrop-filter: blur(16px);
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.hint-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.hint-info .count {
+  background: #6366f1; /* Indigo accent */
+  min-width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 11px;
+}
+
+.hint-info .label {
+  color: var(--theme-text-muted);
+}
+
+.hint-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--theme-border);
+}
+
+.hint-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.hint-btn {
+  background: color-mix(in srgb, var(--theme-surface) 18%, transparent);
+  border: 1px solid var(--theme-border);
+  color: var(--theme-selection-text);
+  padding: 6px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.16s;
+  font-weight: 500;
+}
+
+.hint-btn:hover {
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: scale(1.03);
+}
+
+.hint-btn:active {
+  transform: scale(0.97);
+}
+
+.hint-btn.danger:hover {
+  background: #ef4444;
+  border-color: #ef4444;
+}
+
+.action-center:hover {
+  color: #fbbf24; /* Amber hint on hover for alignment */
+}
