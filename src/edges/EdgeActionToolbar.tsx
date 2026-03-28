@@ -1,8 +1,7 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { EdgeLabelRenderer, useStore as useRFStore } from 'reactflow';
-import { useShallow } from 'zustand/react/shallow';
 import { useDiagramCommands } from '../hooks/useDiagramCommands';
-import useUIStore from '../store/useUIStore';
+import { useEdgeEditingState } from '../store/selectors';
 import '../components/ContextToolbar.css';
 
 interface EdgeActionToolbarProps {
@@ -13,28 +12,13 @@ interface EdgeActionToolbarProps {
 }
 
 const EdgeActionToolbar: React.FC<EdgeActionToolbarProps> = ({ id, data, labelX, labelY }) => {
-  const {
-    setSelectedEdgeIds,
-    isEditingLabel,
-    setEditingLabel,
-    selectedNodeIds,
-    selectedEdgeIds,
-  } = useUIStore(
-    useShallow((state) => ({
-      setSelectedEdgeIds: state.setSelectedEdgeIds,
-      isEditingLabel: state.isEditingLabel,
-      setEditingLabel: state.setEditingLabel,
-      selectedNodeIds: state.selectedNodeIds,
-      selectedEdgeIds: state.selectedEdgeIds,
-    })),
-  );
+  const { isSingleEdgeSelected, isEditingLabel, setEditingLabel, setSelectedEdgeIds } =
+    useEdgeEditingState();
   const { deleteSelection, updateEdgeData } = useDiagramCommands();
   const inputRef = useRef<HTMLInputElement>(null);
-  
+
   // To detect if the edge is selected, we need to check RF state
   const isSelected = useRFStore(useCallback((s) => s.edges.find((e) => e.id === id)?.selected, [id]));
-
-  const isSingleEdgeSelected = selectedEdgeIds.length === 1 && selectedNodeIds.length === 0;
 
   const [label, setLabel] = useState(data?.label || '');
 

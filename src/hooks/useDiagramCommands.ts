@@ -126,8 +126,8 @@ function createDiagramCommands(): DiagramCommands {
 
       useHistoryStore.getState().pushSnapshot(diagramStore.createSnapshot());
       useDiagramStore.setState({
-        nodes: [...nodes.map((node) => ({ ...node, selected: false })), ...pastedNodes],
-        edges: [...edges.map((edge) => ({ ...edge, selected: false })), ...pastedEdges],
+        nodes: [...nodes.map((node) => (node.selected ? { ...node, selected: false } : node)), ...pastedNodes],
+        edges: [...edges.map((edge) => (edge.selected ? { ...edge, selected: false } : edge)), ...pastedEdges],
       });
       useUIStore.setState({
         selectedNodeIds: pastedNodes.map((node) => node.id),

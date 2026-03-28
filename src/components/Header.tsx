@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { LayoutTemplate, MoonStar, SunMedium } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useThemeStore } from '../theme';
@@ -12,10 +12,12 @@ import TemplateGallery from './TemplateGallery';
 import './Header.css';
 
 const Header: React.FC = () => {
-  const { nodes, edges, diagramId, setDiagramId, isSaving } = useDiagramStore(
+  // Subscribe only to the boolean and scalars we need for rendering.
+  // nodes/edges are read imperatively in handleSave so Header doesn't
+  // re-render on every diagram edit just to check `nodes.length > 0`.
+  const { hasNodes, diagramId, setDiagramId, isSaving } = useDiagramStore(
     useShallow((state) => ({
-      nodes: state.nodes,
-      edges: state.edges,
+      hasNodes: state.nodes.length > 0,
       diagramId: state.diagramId,
       setDiagramId: state.setDiagramId,
       isSaving: state.isSaving,
@@ -38,12 +40,18 @@ const Header: React.FC = () => {
   const [isManualSaving, setIsManualSaving] = useState(false);
   const [galleryOpen, setGalleryOpen] = useState(false);
 
-  const handleThemeToggle = () => {
+  const handleThemeToggle = useCallback(() => {
     setTheme(mode === 'dark' ? 'light' : 'dark');
-  };
+  }, [mode, setTheme]);
 
-  const handleSave = async () => {
+  const handleOpenGallery = useCallback(() => setGalleryOpen(true), []);
+  const handleCloseGallery = useCallback(() => setGalleryOpen(false), []);
+
+  const handleSave = useCallback(async () => {
     setIsManualSaving(true);
+
+    // Read the current snapshot imperatively — no subscription needed.
+    const { nodes, edges } = useDiagramStore.getState();
 
     try {
       const result = await saveDiagramToApi({ id: diagramId ?? undefined, nodes, edges });
@@ -58,7 +66,7 @@ const Header: React.FC = () => {
     } finally {
       setIsManualSaving(false);
     }
-  };
+  }, [diagramId, setDiagramId]);
 
   return (
     <header className="app-header">
@@ -67,7 +75,7 @@ const Header: React.FC = () => {
         <div className="header-subtitle">Production workflow builder</div>
       </div>
       <div className="header-actions">
-        {nodes.length > 0 ? (
+        {hasNodes ? (
           <div className={`save-status ${isSaving ? 'saving' : 'saved'}`} key={`${isSaving}`}>
             {isSaving ? 'Saving...' : 'Draft Saved'}
           </div>
@@ -119,7 +127,7 @@ const Header: React.FC = () => {
 
         <button
           className="btn-history btn-templates"
-          onClick={() => setGalleryOpen(true)}
+          onClick={handleOpenGallery}
           title="Browse templates"
         >
           <span className="icon" aria-hidden="true">
@@ -150,9 +158,9 @@ const Header: React.FC = () => {
         </button>
 
       </div>
-      <TemplateGallery open={galleryOpen} onClose={() => setGalleryOpen(false)} />
+      <TemplateGallery open={galleryOpen} onClose={handleCloseGallery} />
     </header>
   );
 };
 
-export default Header;
+export default React.memo(Header);

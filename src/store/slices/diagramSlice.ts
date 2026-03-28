@@ -231,35 +231,48 @@ export const createDiagramSlice: StateCreator<AppState, [], [], Partial<AppState
   },
 
   updateNodeDimensions: (nodeId, dimensions, options) => {
-    if (options?.snapshot !== false) {
+    if (options?.snapshot) {
       get()._takeSnapshot();
     }
 
-    set({
-      nodes: get().nodes.map((node) => {
-        if (node.id !== nodeId) {
-          return node;
-        }
+    const nodes = get().nodes;
+    const index = nodes.findIndex((n) => n.id === nodeId);
+    if (index === -1) return;
 
-        const width = Math.round(dimensions.width);
-        const height = Math.round(dimensions.height);
+    const node = nodes[index];
+    const width = Math.round(dimensions.width);
+    const height = Math.round(dimensions.height);
+    const x = dimensions.x ?? node.position.x;
+    const y = dimensions.y ?? node.position.y;
 
-        return {
-          ...node,
-          width,
-          height,
-          position: {
-            x: dimensions.x ?? node.position.x,
-            y: dimensions.y ?? node.position.y,
-          },
-          data: {
-            ...node.data,
-            width,
-            height,
-          },
-        };
-      }),
-    });
+    // Skip update if nothing changed to avoid unnecessary re-renders
+    if (
+      node.width === width &&
+      node.height === height &&
+      node.position.x === x &&
+      node.position.y === y &&
+      node.data.width === width &&
+      node.data.height === height
+    ) {
+      return;
+    }
+
+    // Structural sharing: Create a new array and new node object but maintain
+    // original references for all other nodes.
+    const nextNodes = [...nodes];
+    nextNodes[index] = {
+      ...node,
+      width,
+      height,
+      position: { x, y },
+      data: {
+        ...node.data,
+        width,
+        height,
+      },
+    } satisfies Node<NodeData>;
+
+    set({ nodes: nextNodes });
   },
 
   updateNodeColor: (nodeId, color) => {

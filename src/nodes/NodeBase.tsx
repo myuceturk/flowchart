@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { NodeLibraryCategory } from './nodeDesignSystem';
 import { getCategoryColors } from './nodeDesignSystem';
 
@@ -65,27 +65,42 @@ const NodeBase: React.FC<NodeBaseProps> = ({
   children,
   onDoubleClick,
 }) => {
-  const colors = getCategoryColors(category);
+  // Memoize getCategoryColors so the style object below gets a stable `colors`
+  // reference when `category` hasn't changed (avoids rebuilding the style object
+  // on every render just because getCategoryColors returns a new object each time).
+  const colors = useMemo(() => getCategoryColors(category), [category]);
+
+  const labelColor = useMemo(() => getNodeLabelColor(backgroundOverride), [backgroundOverride]);
+
+  // Computed once per [className, isActive] pair instead of creating a new
+  // array + filter + join on every render regardless of whether inputs changed.
+  const rootClassName = useMemo(
+    () => ['node-shell', className, isActive ? 'is-active' : ''].filter(Boolean).join(' '),
+    [className, isActive],
+  );
+
+  const nodeStyle = useMemo<React.CSSProperties>(
+    () => ({
+      width,
+      height,
+      '--node-background': backgroundOverride ?? 'var(--theme-node-surface, #eff6ff)',
+      '--node-border': colors.border,
+      '--node-icon': colors.icon,
+      '--node-label-color': labelColor,
+      '--node-glow': colors.glow,
+      '--node-shadow': colors.shadow,
+      '--node-shadow-hover': colors.shadowHover,
+    } as React.CSSProperties),
+    [width, height, backgroundOverride, colors, labelColor],
+  );
 
   return (
     <div
-      className={['node-shell', className, isActive ? 'is-active' : ''].filter(Boolean).join(' ')}
+      className={rootClassName}
       data-node-category={category}
       data-node-tone={colors.tone}
       onDoubleClick={onDoubleClick}
-      style={
-        {
-          width,
-          height,
-          '--node-background': backgroundOverride ?? 'var(--theme-node-surface, #eff6ff)',
-          '--node-border': colors.border,
-          '--node-icon': colors.icon,
-          '--node-label-color': getNodeLabelColor(backgroundOverride),
-          '--node-glow': colors.glow,
-          '--node-shadow': colors.shadow,
-          '--node-shadow-hover': colors.shadowHover,
-        } as React.CSSProperties
-      }
+      style={nodeStyle}
     >
       {overlay}
       <div className="node-shell__body">

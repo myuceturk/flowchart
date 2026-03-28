@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { getPluginDefaultNodeData, usePluginNodeRegistry } from '../plugins/pluginSystem';
 import type { AppNodeType } from '../nodes/types';
 import { useDiagramCommands } from '../hooks/useDiagramCommands';
-import useDiagramStore from '../store/useDiagramStore';
+import { useContextMenuNodeType } from '../store/selectors';
 import useUIStore from '../store/useUIStore';
 import './ContextMenu.css';
 
@@ -17,7 +17,6 @@ const COLORS = [
 ];
 
 const ContextMenu: React.FC = () => {
-  const nodes = useDiagramStore((state) => state.nodes);
   const { contextMenu, closeContextMenu, setSelectedNodeIds } = useUIStore(
     useShallow((state) => ({
       contextMenu: state.contextMenu,
@@ -25,6 +24,10 @@ const ContextMenu: React.FC = () => {
       setSelectedNodeIds: state.setSelectedNodeIds,
     })),
   );
+  // Only subscribes to the type of the right-clicked node — not the whole
+  // nodes array — so ContextMenu does not re-render on unrelated updates.
+  const nodeId = contextMenu.open && contextMenu.target === 'node' ? contextMenu.nodeId : null;
+  const currentNodeType = useContextMenuNodeType(nodeId);
   const {
     duplicateSelection,
     deleteSelection,
@@ -71,73 +74,62 @@ const ContextMenu: React.FC = () => {
     };
   }, [closeContextMenu, contextMenu.open]);
 
+  const handleDuplicate = useCallback(() => {
+    if (!nodeId) return;
+    setSelectedNodeIds([nodeId]);
+    duplicateSelection();
+    closeContextMenu();
+  }, [nodeId, setSelectedNodeIds, duplicateSelection, closeContextMenu]);
+
+  const handleDelete = useCallback(() => {
+    if (!nodeId) return;
+    setSelectedNodeIds([nodeId]);
+    deleteSelection();
+    closeContextMenu();
+  }, [nodeId, setSelectedNodeIds, deleteSelection, closeContextMenu]);
+
+  const handleTypeChange = useCallback(
+    (type: AppNodeType) => {
+      if (!nodeId) return;
+      updateNodeType(nodeId, type);
+      closeContextMenu();
+    },
+    [nodeId, updateNodeType, closeContextMenu],
+  );
+
+  const handleColorChange = useCallback(
+    (color: string | null) => {
+      if (!nodeId) return;
+      updateNodeColor(nodeId, color);
+      closeContextMenu();
+    },
+    [nodeId, updateNodeColor, closeContextMenu],
+  );
+
+  const handlePaste = useCallback(() => {
+    pasteClipboard({ x: contextMenu.flowX, y: contextMenu.flowY });
+    closeContextMenu();
+  }, [contextMenu.flowX, contextMenu.flowY, pasteClipboard, closeContextMenu]);
+
+  const handleAddNode = useCallback(
+    (type: AppNodeType) => {
+      const defaults = getPluginDefaultNodeData(type);
+      addNode({
+        id: crypto.randomUUID(),
+        type,
+        position: { x: contextMenu.flowX, y: contextMenu.flowY },
+        width: defaults.width,
+        height: defaults.height,
+        data: defaults,
+      });
+      closeContextMenu();
+    },
+    [contextMenu.flowX, contextMenu.flowY, addNode, closeContextMenu],
+  );
+
   if (!contextMenu.open) {
     return null;
   }
-
-  const currentNode =
-    contextMenu.target === 'node' && contextMenu.nodeId
-      ? nodes.find((node) => node.id === contextMenu.nodeId)
-      : null;
-
-  const handleDuplicate = () => {
-    if (!currentNode) {
-      return;
-    }
-
-    setSelectedNodeIds([currentNode.id]);
-    duplicateSelection();
-    closeContextMenu();
-  };
-
-  const handleDelete = () => {
-    if (!currentNode) {
-      return;
-    }
-
-    setSelectedNodeIds([currentNode.id]);
-    deleteSelection();
-    closeContextMenu();
-  };
-
-  const handleTypeChange = (type: AppNodeType) => {
-    if (!currentNode) {
-      return;
-    }
-
-    updateNodeType(currentNode.id, type);
-    closeContextMenu();
-  };
-
-  const handleColorChange = (color: string | null) => {
-    if (!currentNode) {
-      return;
-    }
-
-    updateNodeColor(currentNode.id, color);
-    closeContextMenu();
-  };
-
-  const handlePaste = () => {
-    pasteClipboard({ x: contextMenu.flowX, y: contextMenu.flowY });
-    closeContextMenu();
-  };
-
-  const handleAddNode = (type: AppNodeType) => {
-    const defaults = getPluginDefaultNodeData(type);
-    addNode({
-      id: crypto.randomUUID(),
-      type,
-      position: {
-        x: contextMenu.flowX,
-        y: contextMenu.flowY,
-      },
-      width: defaults.width,
-      height: defaults.height,
-      data: defaults,
-    });
-    closeContextMenu();
-  };
 
   return (
     <div
@@ -145,7 +137,7 @@ const ContextMenu: React.FC = () => {
       className="context-menu"
       style={{ left: contextMenu.x, top: contextMenu.y }}
     >
-      {contextMenu.target === 'node' && currentNode ? (
+      {contextMenu.target === 'node' && nodeId ? (
         <>
           <button type="button" className="context-menu__item" onClick={handleDuplicate}>
             Duplicate
@@ -162,7 +154,7 @@ const ContextMenu: React.FC = () => {
                   <button
                     key={type.value}
                     type="button"
-                    className={`context-menu__chip ${currentNode.type === type.value ? 'is-active' : ''}`}
+                    className={`context-menu__chip ${currentNodeType === type.value ? 'is-active' : ''}`}
                     onClick={() => handleTypeChange(type.value)}
                   >
                     {type.label}

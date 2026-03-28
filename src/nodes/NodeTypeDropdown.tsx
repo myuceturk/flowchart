@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePluginNodeRegistry } from '../plugins/pluginSystem';
 import type { AppNodeType } from './types';
 
@@ -7,14 +7,24 @@ interface NodeTypeDropdownProps {
   onChange: (type: AppNodeType) => void;
 }
 
+// Stable SVG chevron — same markup every render, no need to re-create the element.
+const CHEVRON_SVG = (
+  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2.5 4L5 6.5L7.5 4" />
+  </svg>
+);
+
 const NodeTypeDropdown: React.FC<NodeTypeDropdownProps> = ({ value, onChange }) => {
   const registry = usePluginNodeRegistry();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const currentDef = registry
-    .flatMap((cat) => cat.nodes)
-    .find((n) => n.type === value);
+  // flatMap + find runs on every render without memo; with memo it only reruns
+  // when `registry` or `value` actually changes.
+  const currentDef = useMemo(
+    () => registry.flatMap((cat) => cat.nodes).find((n) => n.type === value),
+    [registry, value],
+  );
 
   const handleSelect = useCallback(
     (type: AppNodeType) => {
@@ -55,9 +65,7 @@ const NodeTypeDropdown: React.FC<NodeTypeDropdownProps> = ({ value, onChange }) 
         title="Change node type"
       >
         {currentDef?.label ?? value}
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M2.5 4L5 6.5L7.5 4" />
-        </svg>
+        {CHEVRON_SVG}
       </button>
 
       {open && (

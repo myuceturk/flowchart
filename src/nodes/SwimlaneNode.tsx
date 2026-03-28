@@ -1,14 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Handle, Position } from 'reactflow';
-import { useShallow } from 'zustand/react/shallow';
 import { getPluginNodeDefinition } from '../plugins/pluginSystem';
 import ResizeHandles from '../components/ResizeHandles';
 import { useDiagramCommands } from '../hooks/useDiagramCommands';
+import { useNodeData, useNodeEditingState } from '../store/selectors';
 import NodeActionToolbar from './NodeActionToolbar';
 import { getCategoryColors } from './nodeDesignSystem';
 import type { CustomNodeProps } from './types';
-import useDiagramStore from '../store/useDiagramStore';
-import useUIStore from '../store/useUIStore';
 import './nodes.css';
 
 const HANDLE_CONFIG = [
@@ -20,23 +18,12 @@ const HANDLE_CONFIG = [
 
 const SwimlaneNode: React.FC<CustomNodeProps> = ({ id, data, selected }) => {
   const { updateNodeData } = useDiagramCommands();
-  const {
-    selectedNodeIds,
-    selectedEdgeIds,
-    isEditingLabel,
-    setEditingLabel,
-  } = useUIStore(useShallow((state) => ({
-    selectedNodeIds: state.selectedNodeIds,
-    selectedEdgeIds: state.selectedEdgeIds,
-    isEditingLabel: state.isEditingLabel,
-    setEditingLabel: state.setEditingLabel,
-  })));
-  const nodeData = useDiagramStore((state) => state.nodes.find((node) => node.id === id)?.data) ?? data;
-  const isSingleNodeSelected = selectedNodeIds.length === 1 && selectedEdgeIds.length === 0;
-  const definition = getPluginNodeDefinition('swimlane');
+  const { isSingleNodeSelected, isEditingLabel, setEditingLabel } = useNodeEditingState();
+  const nodeData = useNodeData(id) ?? data;
+  const definition = useMemo(() => getPluginNodeDefinition('swimlane'), []);
   const [isEditing, setIsEditing] = useState(false);
   const [innerLabel, setInnerLabel] = useState(nodeData.label || 'Swimlane');
-  const colors = getCategoryColors(definition?.category ?? 'Advanced');
+  const colors = useMemo(() => getCategoryColors(definition?.category ?? 'Advanced'), [definition]);
 
   useEffect(() => {
     if (isEditingLabel && selected) {
@@ -74,29 +61,33 @@ const SwimlaneNode: React.FC<CustomNodeProps> = ({ id, data, selected }) => {
     [nodeData.height, nodeData.width],
   );
 
+  const rootClassName = useMemo(
+    () => `node-shell node-swimlane${isEditing ? ' is-active' : ''}`,
+    [isEditing],
+  );
+
+  const nodeStyle = useMemo<React.CSSProperties>(
+    () => ({
+      width: dimensions.width,
+      height: dimensions.height,
+      '--node-background': nodeData.color ?? 'var(--theme-node-surface, #f8fafc)',
+      '--node-border': colors.border,
+      '--node-icon': colors.icon,
+      '--node-label-color': '#1e293b',
+      '--node-glow': colors.glow,
+      '--node-shadow': colors.shadow,
+      '--node-shadow-hover': colors.shadowHover,
+    } as React.CSSProperties),
+    [dimensions.width, dimensions.height, nodeData.color, colors],
+  );
+
   return (
     <div
-      className={[
-        'node-shell',
-        'node-swimlane',
-        isEditing ? 'is-active' : '',
-      ].filter(Boolean).join(' ')}
+      className={rootClassName}
       data-node-category={definition?.category ?? 'Advanced'}
       data-node-tone={colors.tone}
       onDoubleClick={onDoubleClick}
-      style={
-        {
-          width: dimensions.width,
-          height: dimensions.height,
-          '--node-background': nodeData.color ?? 'var(--theme-node-surface, #f8fafc)',
-          '--node-border': colors.border,
-          '--node-icon': colors.icon,
-          '--node-label-color': '#1e293b',
-          '--node-glow': colors.glow,
-          '--node-shadow': colors.shadow,
-          '--node-shadow-hover': colors.shadowHover,
-        } as React.CSSProperties
-      }
+      style={nodeStyle}
     >
       {selected && isSingleNodeSelected ? (
         <NodeActionToolbar id={id} type="swimlane" data={nodeData} />

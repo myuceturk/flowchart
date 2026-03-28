@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Handle, Position, useUpdateNodeInternals } from 'reactflow';
-import { useShallow } from 'zustand/react/shallow';
 import { getPluginNodeDefinition } from '../plugins/pluginSystem';
 import ResizeHandles from '../components/ResizeHandles';
 import { useDiagramCommands } from '../hooks/useDiagramCommands';
+import { useNodeData, useNodeEditingState } from '../store/selectors';
 import NodeActionToolbar from './NodeActionToolbar';
 import NodeBase from './NodeBase';
 import {
@@ -11,8 +11,6 @@ import {
   DECISION_TARGET_HANDLES,
 } from './decisionHandles';
 import type { CustomNodeProps } from './types';
-import useDiagramStore from '../store/useDiagramStore';
-import useUIStore from '../store/useUIStore';
 import './nodes.css';
 
 type DecisionHandleHintProps = {
@@ -21,27 +19,25 @@ type DecisionHandleHintProps = {
   label: string;
 };
 
-const DecisionHandleHint: React.FC<DecisionHandleHintProps> = ({ className, tone, label }) => (
-  <span className={`decision-hint ${className} decision-hint--${tone}`}>
-    {label}
-  </span>
-);
+// All props are static string constants at every call-site, so memo eliminates
+// 4 unnecessary re-renders each time DecisionNode re-renders for isEditing /
+// innerLabel state changes.
+const DecisionHandleHint = React.memo<DecisionHandleHintProps>(function DecisionHandleHint({
+  className,
+  tone,
+  label,
+}) {
+  return (
+    <span className={`decision-hint ${className} decision-hint--${tone}`}>
+      {label}
+    </span>
+  );
+});
 
 const DecisionNode: React.FC<CustomNodeProps> = ({ id, data, selected }) => {
   const { updateNodeData } = useDiagramCommands();
-  const {
-    selectedNodeIds,
-    selectedEdgeIds,
-    isEditingLabel,
-    setEditingLabel,
-  } = useUIStore(useShallow((state) => ({
-    selectedNodeIds: state.selectedNodeIds,
-    selectedEdgeIds: state.selectedEdgeIds,
-    isEditingLabel: state.isEditingLabel,
-    setEditingLabel: state.setEditingLabel,
-  })));
-  const nodeData = useDiagramStore((state) => state.nodes.find((node) => node.id === id)?.data) ?? data;
-  const isSingleNodeSelected = selectedNodeIds.length === 1 && selectedEdgeIds.length === 0;
+  const { isSingleNodeSelected, isEditingLabel, setEditingLabel } = useNodeEditingState();
+  const nodeData = useNodeData(id) ?? data;
   const definition = getPluginNodeDefinition('decision');
   const updateNodeInternals = useUpdateNodeInternals();
   const [isEditing, setIsEditing] = useState(false);

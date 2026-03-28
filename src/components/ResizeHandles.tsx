@@ -45,6 +45,12 @@ const ResizeHandles: React.FC<ResizeHandlesProps> = ({ nodeId, nodeType, data, s
 
   const { minWidth, minHeight } = useMemo(() => getNodeMinSize(nodeType, data), [data, nodeType]);
 
+  // Pending dimensions calculated on the latest pointer event, flushed to the
+  // store on the next animation frame.  Keeps the store write rate at ≤60/sec
+  // regardless of pointer event frequency (144Hz displays, stylus, etc.).
+  const pendingDimRef = useRef<{ width: number; height: number; x: number; y: number } | null>(null);
+  const resizeRafRef = useRef<number | null>(null);
+
   const commitResize = useCallback(() => {
     frameRef.current = null;
     updateNodeInternals(nodeId);
@@ -119,12 +125,34 @@ const ResizeHandles: React.FC<ResizeHandlesProps> = ({ nodeId, nodeType, data, s
         }
       }
 
-      updateNodeDimensions(nodeId, { width, height, x, y });
+      // Accumulate the latest computed dimensions and schedule a single store
+      // write per animation frame — the pointer can fire faster than 60 Hz.
+      pendingDimRef.current = { width, height, x, y };
+
+      if (!resizeRafRef.current) {
+        resizeRafRef.current = requestAnimationFrame(() => {
+          resizeRafRef.current = null;
+          if (pendingDimRef.current) {
+            updateNodeDimensions(nodeId, pendingDimRef.current);
+            pendingDimRef.current = null;
+          }
+        });
+      }
     };
 
     const handlePointerUp = () => {
       if (!frameRef.current) {
         return;
+      }
+
+      // Flush any pending frame before committing so the final size is applied.
+      if (resizeRafRef.current !== null) {
+        cancelAnimationFrame(resizeRafRef.current);
+        resizeRafRef.current = null;
+      }
+      if (pendingDimRef.current) {
+        updateNodeDimensions(nodeId, pendingDimRef.current);
+        pendingDimRef.current = null;
       }
 
       commitResize();
@@ -136,6 +164,10 @@ const ResizeHandles: React.FC<ResizeHandlesProps> = ({ nodeId, nodeType, data, s
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
+      if (resizeRafRef.current !== null) {
+        cancelAnimationFrame(resizeRafRef.current);
+        resizeRafRef.current = null;
+      }
     };
   }, [commitResize, getNode, getZoom, minHeight, minWidth, nodeId, updateNodeDimensions]);
 

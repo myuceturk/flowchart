@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { ReactFlowProvider } from 'reactflow';
+import { useShallow } from 'zustand/react/shallow';
 import Canvas from './components/Canvas';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -16,9 +17,24 @@ const ONBOARDING_KEY = 'fdb_onboarding_shown';
 function App() {
   const { loading } = useDiagramBootstrap();
   useAutoSave(!loading);
-  const nodes = useDiagramStore((state) => state.nodes);
-  const isTemplateGalleryOpen = useUIStore((state) => state.isTemplateGalleryOpen);
-  const setTemplateGalleryOpen = useUIStore((state) => state.setTemplateGalleryOpen);
+
+  // Subscribe to a boolean, not the full nodes array — App no longer re-renders
+  // on every node edit, only when the diagram transitions between empty/non-empty.
+  const hasNodes = useDiagramStore((state) => state.nodes.length > 0);
+
+  // Merge into one subscription so only one store listener is registered.
+  const { isTemplateGalleryOpen, setTemplateGalleryOpen } = useUIStore(
+    useShallow((state) => ({
+      isTemplateGalleryOpen: state.isTemplateGalleryOpen,
+      setTemplateGalleryOpen: state.setTemplateGalleryOpen,
+    })),
+  );
+
+  // Stable reference so TemplateGallery's React.memo is not bypassed on re-renders.
+  const handleCloseTemplateGallery = useCallback(
+    () => setTemplateGalleryOpen(false),
+    [setTemplateGalleryOpen],
+  );
 
   useEffect(() => {
     Object.entries(animationCssVariables).forEach(([key, value]) => {
@@ -30,11 +46,11 @@ function App() {
   useEffect(() => {
     if (loading) return;
     const alreadyShown = localStorage.getItem(ONBOARDING_KEY);
-    if (!alreadyShown && nodes.length === 0) {
+    if (!alreadyShown && !hasNodes) {
       setTemplateGalleryOpen(true);
       localStorage.setItem(ONBOARDING_KEY, 'true');
     }
-  }, [loading, nodes.length, setTemplateGalleryOpen]);
+  }, [loading, hasNodes, setTemplateGalleryOpen]);
 
   if (loading) {
     return <div className="app-loading">Loading diagram...</div>;
@@ -51,7 +67,7 @@ function App() {
           </div>
         </ReactFlowProvider>
       </div>
-      <TemplateGallery open={isTemplateGalleryOpen} onClose={() => setTemplateGalleryOpen(false)} />
+      <TemplateGallery open={isTemplateGalleryOpen} onClose={handleCloseTemplateGallery} />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -8,6 +8,9 @@ import {
   Panel,
   ReactFlow,
   useReactFlow,
+  type Edge,
+  type Node,
+  type OnSelectionChangeParams,
   type SelectionMode,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -35,6 +38,19 @@ import { useCanvasNodeDnD } from './hooks/useCanvasNodeDnD';
 import { useNodeAlignmentGuides } from './hooks/useNodeAlignmentGuides';
 import { usePluginCanvasActionContext } from './hooks/usePluginCanvasActionContext';
 
+// Module-level constants so ReactFlow receives the same reference on every
+// render instead of new objects, preventing spurious internal ReactFlow work.
+const SNAP_GRID: [number, number] = [15, 15];
+const DEFAULT_EDGE_OPTIONS = { type: 'labeled' } as const;
+
+// Above this node count, enable ReactFlow's viewport culling so only DOM nodes
+// in the visible viewport are rendered.  Below the threshold every node renders
+// so there is zero pop-in during normal use.  The trade-off above the threshold:
+// a node's local React state (e.g. in-progress label edit) is lost if it scrolls
+// fully off-screen — acceptable for large diagrams where the user is rarely
+// editing and panning simultaneously.
+const VIEWPORT_CULLING_THRESHOLD = 200;
+
 const CanvasView: React.FC = () => {
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect, setDiagram } =
     useDiagramStore(
@@ -48,7 +64,6 @@ const CanvasView: React.FC = () => {
       })),
     );
   const {
-    helperLines,
     setHelperLines,
     selectedNodeIds,
     activeTool,
@@ -60,7 +75,6 @@ const CanvasView: React.FC = () => {
     setTemplateGalleryOpen,
   } = useUIStore(
     useShallow((state) => ({
-      helperLines: state.helperLines,
       setHelperLines: state.setHelperLines,
       selectedNodeIds: state.selectedNodeIds,
       activeTool: state.activeTool,
@@ -82,6 +96,18 @@ const CanvasView: React.FC = () => {
     addNode,
   } = useDiagramCommands();
   const customTheme = useThemeStore((state) => state.customTheme);
+
+  // Memoized so MiniMap doesn't receive a new function reference on every
+  // CanvasView render, which would cause it to re-paint every node.
+  const miniMapNodeColor = useCallback(
+    (node: Node) =>
+      node.data?.color ??
+      customTheme.node ??
+      getPluginNodeDefinition(node.type ?? '')?.miniMapColor ??
+      '#94a3b8',
+    [customTheme.node],
+  );
+
   const pluginNodeTypes = usePluginNodeTypes();
   const pluginToolbarItems = usePluginToolbarItems();
   const { screenToFlowPosition, getNodes, fitView } = useReactFlow();
@@ -92,8 +118,10 @@ const CanvasView: React.FC = () => {
     const nodeIds = useDiagramStore.getState().nodes.map((node) => node.id);
 
     useDiagramStore.setState((state) => ({
-      nodes: state.nodes.map((node) => ({ ...node, selected: true })),
-      edges: state.edges.map((edge) => ({ ...edge, selected: false })),
+      // Structural sharing: only allocate a new object for nodes not yet selected.
+      // With 2000 nodes already selected (e.g. re-pressing Ctrl+A), zero allocations.
+      nodes: state.nodes.map((node) => (node.selected ? node : { ...node, selected: true })),
+      edges: state.edges.map((edge) => (edge.selected ? { ...edge, selected: false } : edge)),
     }));
     useUIStore.setState({
       selectedNodeIds: nodeIds,
@@ -156,6 +184,33 @@ const CanvasView: React.FC = () => {
     screenToFlowPosition,
   });
 
+  // Throttle selection updates to one per animation frame.
+  // During a box-select over 500 nodes ReactFlow fires this callback at pointer-move
+  // rate (120+ events/sec). Each call maps N node objects to IDs then compares N
+  // strings. Coalescing to rAF drops that to ≤60 updates/sec with zero stale risk
+  // (we always use the most-recent params captured before the frame fires).
+  const selectionRafRef = useRef<number | null>(null);
+
+  const onSelectionChange = useCallback(
+    ({ nodes: selectedNodes, edges: selectedEdges }: OnSelectionChangeParams) => {
+      if (selectionRafRef.current !== null) {
+        cancelAnimationFrame(selectionRafRef.current);
+      }
+      selectionRafRef.current = requestAnimationFrame(() => {
+        selectionRafRef.current = null;
+        setSelectedNodeIds(selectedNodes.map((n: Node) => n.id));
+        setSelectedEdgeIds(selectedEdges.map((e: Edge) => e.id));
+      });
+    },
+    [setSelectedNodeIds, setSelectedEdgeIds],
+  );
+
+  // Stable reference so EmptyState's React.memo isn't bypassed on every
+  // CanvasView render (e.g. on activeTool change while canvas is empty).
+  const handleOpenTemplates = useCallback(() => {
+    setTemplateGalleryOpen(true);
+  }, [setTemplateGalleryOpen]);
+
   const isPanMode = activeTool === 'hand' || isSpacePanning;
 
   const handleCenterView = useCallback(() => {
@@ -187,7 +242,7 @@ const CanvasView: React.FC = () => {
         edges={edges}
         nodeTypes={pluginNodeTypes}
         edgeTypes={edgeTypes}
-        defaultEdgeOptions={{ type: 'labeled' }}
+        defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -199,9 +254,10 @@ const CanvasView: React.FC = () => {
         onNodeDrag={onNodeDrag}
         onDrop={onDrop}
         onDragOver={onDragOver}
+        onSelectionChange={onSelectionChange}
         fitView
         snapToGrid
-        snapGrid={[15, 15]}
+        snapGrid={SNAP_GRID}
         deleteKeyCode={null}
         selectionMode={'partial' as SelectionMode}
         selectionOnDrag={!isPanMode}
@@ -213,17 +269,13 @@ const CanvasView: React.FC = () => {
         nodesConnectable={!isPanMode}
         elementsSelectable={!isPanMode}
         connectionMode={ConnectionMode.Loose}
+        onlyRenderVisibleElements={nodes.length > VIEWPORT_CULLING_THRESHOLD}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color={customTheme.grid} />
         <Controls />
         <MiniMap
           position="bottom-right"
-          nodeColor={(node) =>
-            node.data?.color ??
-            customTheme.node ??
-            getPluginNodeDefinition(node.type ?? '')?.miniMapColor ??
-            '#94a3b8'
-          }
+          nodeColor={miniMapNodeColor}
           maskColor="rgba(0, 0, 0, 0.1)"
           className="custom-minimap"
           zoomable
@@ -251,12 +303,9 @@ const CanvasView: React.FC = () => {
         </Panel>
         <SelectionToolbar />
         {nodes.length === 0 && (
-          <EmptyState onOpenTemplates={() => setTemplateGalleryOpen(true)} />
+          <EmptyState onOpenTemplates={handleOpenTemplates} />
         )}
-        <AlignmentGuides
-          vertical={helperLines.vertical}
-          horizontal={helperLines.horizontal}
-        />
+        <AlignmentGuides />
       </ReactFlow>
       <ContextMenu />
       <NodeSearch />

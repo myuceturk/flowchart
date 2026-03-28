@@ -1,18 +1,14 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Download, Upload, Image, FileText, FileJson, ChevronDown } from 'lucide-react';
-import { useShallow } from 'zustand/react/shallow';
 import { exportToPng, exportToPdf, exportToJson, importFromJson } from '../utils/exportUtils';
 import useDiagramStore from '../store/useDiagramStore';
 import './ExportMenu.css';
 
 const ExportMenu: React.FC = () => {
-  const { nodes, edges, setDiagram } = useDiagramStore(
-    useShallow((state) => ({
-      nodes: state.nodes,
-      edges: state.edges,
-      setDiagram: state.setDiagram,
-    })),
-  );
+  // Only `setDiagram` is needed for rendering; nodes/edges are read
+  // imperatively inside click handlers so ExportMenu doesn't re-render on
+  // every diagram edit.
+  const setDiagram = useDiagramStore((state) => state.setDiagram);
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -54,7 +50,7 @@ const ExportMenu: React.FC = () => {
 
   const handlePng = async () => {
     try {
-      await exportToPng(nodes);
+      await exportToPng(useDiagramStore.getState().nodes);
       showStatus('PNG exported');
     } catch (err) {
       console.error(err);
@@ -64,7 +60,7 @@ const ExportMenu: React.FC = () => {
 
   const handlePdf = async () => {
     try {
-      await exportToPdf(nodes);
+      await exportToPdf(useDiagramStore.getState().nodes);
       showStatus('PDF exported');
     } catch (err) {
       console.error(err);
@@ -74,6 +70,7 @@ const ExportMenu: React.FC = () => {
 
   const handleJson = () => {
     try {
+      const { nodes, edges } = useDiagramStore.getState();
       exportToJson(nodes, edges);
       showStatus('JSON exported');
     } catch (err) {

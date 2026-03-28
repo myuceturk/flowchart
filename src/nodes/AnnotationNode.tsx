@@ -1,30 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useShallow } from 'zustand/react/shallow';
 import { getPluginNodeDefinition } from '../plugins/pluginSystem';
 import ResizeHandles from '../components/ResizeHandles';
 import { useDiagramCommands } from '../hooks/useDiagramCommands';
+import { useNodeData, useNodeEditingState } from '../store/selectors';
 import NodeActionToolbar from './NodeActionToolbar';
 import NodeBase from './NodeBase';
 import type { CustomNodeProps } from './types';
-import useDiagramStore from '../store/useDiagramStore';
-import useUIStore from '../store/useUIStore';
 import './nodes.css';
 
 const AnnotationNode: React.FC<CustomNodeProps> = ({ id, data, selected }) => {
   const { updateNodeData } = useDiagramCommands();
-  const {
-    selectedNodeIds,
-    selectedEdgeIds,
-    isEditingLabel,
-    setEditingLabel,
-  } = useUIStore(useShallow((state) => ({
-    selectedNodeIds: state.selectedNodeIds,
-    selectedEdgeIds: state.selectedEdgeIds,
-    isEditingLabel: state.isEditingLabel,
-    setEditingLabel: state.setEditingLabel,
-  })));
-  const nodeData = useDiagramStore((state) => state.nodes.find((node) => node.id === id)?.data) ?? data;
-  const isSingleNodeSelected = selectedNodeIds.length === 1 && selectedEdgeIds.length === 0;
+  const { isSingleNodeSelected, isEditingLabel, setEditingLabel } = useNodeEditingState();
+  const nodeData = useNodeData(id) ?? data;
   const definition = getPluginNodeDefinition('annotation');
   const [isEditing, setIsEditing] = useState(false);
   const [innerLabel, setInnerLabel] = useState(nodeData.label || 'Note');

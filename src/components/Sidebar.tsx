@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, type FC } from 'react';
 import { useReactFlow } from 'reactflow';
 import { useShallow } from 'zustand/react/shallow';
 import {
@@ -36,6 +36,61 @@ type ToolItem = {
   indicator?: string;
   run?: (context: ReturnType<typeof createPluginActionContext>) => void;
 };
+
+// ---------------------------------------------------------------------------
+// ConnectedSidebarItem
+// ---------------------------------------------------------------------------
+// Wraps SidebarItem with per-item stable useCallback handlers so that the
+// parent Sidebar re-rendering (e.g. on activeTool change) does NOT force
+// every list item to re-render. Without this wrapper the inline arrow
+// `onClick={() => handleItemClick(item)}` in the parent's .map() creates a
+// new function reference each render, defeating SidebarItem's React.memo.
+//
+// With this wrapper:
+//  - onItemClick / onDragStart / onDragEnd are stable (useCallback from Sidebar)
+//  - item is a stable reference (from module constants or useMemo'd categories)
+//  - onClick / onDragStart are stable inside this component (useCallback)
+//  - SidebarItem only re-renders when active, collapsed, or item data changes
+// ---------------------------------------------------------------------------
+type ConnectedSidebarItemProps = {
+  item: ToolItem;
+  collapsed: boolean;
+  activeTool: string;
+  onItemClick: (item: ToolItem) => void;
+  onDragStart: (event: React.DragEvent<HTMLButtonElement>, item: ToolItem) => void;
+  onDragEnd: () => void;
+};
+
+const ConnectedSidebarItem: FC<ConnectedSidebarItemProps> = memo(function ConnectedSidebarItem({
+  item,
+  collapsed,
+  activeTool,
+  onItemClick,
+  onDragStart: handleDragStart,
+  onDragEnd,
+}) {
+  const onClick = useCallback(() => onItemClick(item), [onItemClick, item]);
+  const onDragStart = useCallback(
+    (e: React.DragEvent<HTMLButtonElement>) => handleDragStart(e, item),
+    [handleDragStart, item],
+  );
+
+  return (
+    <SidebarItem
+      icon={item.icon}
+      label={item.label}
+      description={item.description}
+      collapsed={collapsed}
+      active={activeTool === item.id}
+      tone={item.tone}
+      draggable={Boolean(item.payload)}
+      indicator={item.indicator}
+      onClick={onClick}
+      onDragStart={item.payload ? onDragStart : undefined}
+      onDragEnd={item.payload ? onDragEnd : undefined}
+    />
+  );
+});
 
 const coreTools: ToolItem[] = [
   {
@@ -234,15 +289,14 @@ const Sidebar: React.FC = () => {
             {!sidebarCollapsed ? <div className="sidebar-section__title">Core Tools</div> : null}
             <div className="sidebar-section__items">
               {coreTools.map((item) => (
-                <SidebarItem
+                <ConnectedSidebarItem
                   key={item.label}
-                  icon={item.icon}
-                  label={item.label}
-                  description={item.description}
+                  item={item}
                   collapsed={sidebarCollapsed}
-                  active={activeTool === item.id}
-                  tone={item.tone}
-                  onClick={() => handleItemClick(item)}
+                  activeTool={activeTool}
+                  onItemClick={handleItemClick}
+                  onDragStart={handleDragStart}
+                  onDragEnd={removeDragPreview}
                 />
               ))}
             </div>
@@ -253,21 +307,14 @@ const Sidebar: React.FC = () => {
               {!sidebarCollapsed ? <div className="sidebar-section__title">Plugins</div> : null}
               <div className="sidebar-section__items">
                 {pluginSidebarItems.map((item) => (
-                  <SidebarItem
+                  <ConnectedSidebarItem
                     key={`${item.pluginName}-${item.id}`}
-                    icon={item.icon}
-                    label={item.label}
-                    description={item.description}
+                    item={item as ToolItem}
                     collapsed={sidebarCollapsed}
-                    active={false}
-                    tone={item.tone}
-                    draggable={Boolean(item.payload)}
-                    indicator={item.indicator}
-                    onClick={() => handleItemClick(item)}
-                    onDragStart={
-                      item.payload ? (event) => handleDragStart(event, item as ToolItem) : undefined
-                    }
-                    onDragEnd={item.payload ? removeDragPreview : undefined}
+                    activeTool={activeTool}
+                    onItemClick={handleItemClick}
+                    onDragStart={handleDragStart}
+                    onDragEnd={removeDragPreview}
                   />
                 ))}
               </div>
@@ -286,18 +333,13 @@ const Sidebar: React.FC = () => {
             >
               <div className="sidebar-section__items">
                 {category.items.map((item) => (
-                  <SidebarItem
+                  <ConnectedSidebarItem
                     key={`${category.id}-${item.label}`}
-                    icon={item.icon}
-                    label={item.label}
-                    description={item.description}
+                    item={item}
                     collapsed={sidebarCollapsed}
-                    active={activeTool === item.id}
-                    tone={item.tone}
-                    draggable={Boolean(item.payload)}
-                    indicator={item.indicator}
-                    onClick={() => handleItemClick(item)}
-                    onDragStart={(event) => handleDragStart(event, item)}
+                    activeTool={activeTool}
+                    onItemClick={handleItemClick}
+                    onDragStart={handleDragStart}
                     onDragEnd={removeDragPreview}
                   />
                 ))}

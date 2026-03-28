@@ -3,6 +3,16 @@ import type { Node } from 'reactflow';
 import type { AppState } from '../../../types';
 import { getAlignmentLines } from '../../../utils/alignment';
 
+// Disable alignment guides entirely above this node count.
+// At 150 nodes, getAlignmentLines() does 150 bound-checks at 60 fps = 9,000/sec.
+// At 500+ nodes that becomes 30,000+/sec for a feature most users won't notice.
+const ALIGNMENT_GUIDE_NODE_LIMIT = 150;
+
+// Only compare nodes within this diagram-space radius when guide checking IS active.
+// Reduces the candidate set for medium diagrams (50–150 nodes) while keeping guides
+// accurate — nodes farther than 500 px can't visually snap anyway.
+const ALIGNMENT_PROXIMITY_RADIUS = 500;
+
 type DragState = {
   id: string;
   rawX: number;
@@ -56,6 +66,14 @@ export function useNodeAlignmentGuides({
         return;
       }
 
+      const currentNodes = getNodes();
+
+      // Skip guide computation entirely on large diagrams — the per-frame cost of
+      // scanning hundreds of nodes outweighs the UX benefit of snapping lines.
+      if (currentNodes.length > ALIGNMENT_GUIDE_NODE_LIMIT) {
+        return;
+      }
+
       const dragState = dragRef.current;
       const dx = node.position.x - dragState.lastX;
       const dy = node.position.y - dragState.lastY;
@@ -67,8 +85,19 @@ export function useNodeAlignmentGuides({
       node.position.x = dragState.rawX;
       node.position.y = dragState.rawY;
 
-      const currentNodes = getNodes();
-      const { vLine, hLine, draggedX, draggedY } = getAlignmentLines(node, currentNodes);
+      // For medium diagrams (50–150 nodes) narrow the candidate set to nearby nodes
+      // before calling getAlignmentLines so the inner loop stays small.
+      const candidateNodes =
+        currentNodes.length > 50
+          ? currentNodes.filter(
+              (n) =>
+                n.id !== node.id &&
+                Math.abs(n.position.x - node.position.x) < ALIGNMENT_PROXIMITY_RADIUS &&
+                Math.abs(n.position.y - node.position.y) < ALIGNMENT_PROXIMITY_RADIUS,
+            )
+          : currentNodes;
+
+      const { vLine, hLine, draggedX, draggedY } = getAlignmentLines(node, candidateNodes);
 
       let finalX = dragState.rawX;
       let finalY = dragState.rawY;

@@ -1,14 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Handle, Position } from 'reactflow';
-import { useShallow } from 'zustand/react/shallow';
 import { getPluginNodeDefinition } from '../plugins/pluginSystem';
 import ResizeHandles from '../components/ResizeHandles';
 import { useDiagramCommands } from '../hooks/useDiagramCommands';
+import { useNodeData, useNodeEditingState } from '../store/selectors';
 import NodeActionToolbar from './NodeActionToolbar';
 import { getCategoryColors } from './nodeDesignSystem';
 import type { CustomNodeProps } from './types';
-import useDiagramStore from '../store/useDiagramStore';
-import useUIStore from '../store/useUIStore';
 import './nodes.css';
 
 const HANDLE_CONFIG = [
@@ -22,23 +20,12 @@ const WAVE_HEIGHT = 14;
 
 const DocumentNode: React.FC<CustomNodeProps> = ({ id, data, selected }) => {
   const { updateNodeData } = useDiagramCommands();
-  const {
-    selectedNodeIds,
-    selectedEdgeIds,
-    isEditingLabel,
-    setEditingLabel,
-  } = useUIStore(useShallow((state) => ({
-    selectedNodeIds: state.selectedNodeIds,
-    selectedEdgeIds: state.selectedEdgeIds,
-    isEditingLabel: state.isEditingLabel,
-    setEditingLabel: state.setEditingLabel,
-  })));
-  const nodeData = useDiagramStore((state) => state.nodes.find((node) => node.id === id)?.data) ?? data;
-  const isSingleNodeSelected = selectedNodeIds.length === 1 && selectedEdgeIds.length === 0;
-  const definition = getPluginNodeDefinition('document');
+  const { isSingleNodeSelected, isEditingLabel, setEditingLabel } = useNodeEditingState();
+  const nodeData = useNodeData(id) ?? data;
+  const definition = useMemo(() => getPluginNodeDefinition('document'), []);
   const [isEditing, setIsEditing] = useState(false);
   const [innerLabel, setInnerLabel] = useState(nodeData.label || 'Document');
-  const colors = getCategoryColors(definition?.category ?? 'Flowchart');
+  const colors = useMemo(() => getCategoryColors(definition?.category ?? 'Flowchart'), [definition]);
 
   useEffect(() => {
     if (isEditingLabel && selected) {
@@ -85,29 +72,33 @@ const DocumentNode: React.FC<CustomNodeProps> = ({ id, data, selected }) => {
     ].join(' ');
   }, [w, h]);
 
+  const rootClassName = useMemo(
+    () => `node-shell node-document-svg${isEditing ? ' is-active' : ''}`,
+    [isEditing],
+  );
+
+  const nodeStyle = useMemo<React.CSSProperties>(
+    () => ({
+      width: w,
+      height: h,
+      '--node-background': nodeData.color ?? 'var(--theme-node-surface, #eff6ff)',
+      '--node-border': colors.border,
+      '--node-icon': colors.icon,
+      '--node-label-color': 'var(--theme-node-label)',
+      '--node-glow': colors.glow,
+      '--node-shadow': colors.shadow,
+      '--node-shadow-hover': colors.shadowHover,
+    } as React.CSSProperties),
+    [w, h, nodeData.color, colors],
+  );
+
   return (
     <div
-      className={[
-        'node-shell',
-        'node-document-svg',
-        isEditing ? 'is-active' : '',
-      ].filter(Boolean).join(' ')}
+      className={rootClassName}
       data-node-category={definition?.category ?? 'Flowchart'}
       data-node-tone={colors.tone}
       onDoubleClick={onDoubleClick}
-      style={
-        {
-          width: w,
-          height: h,
-          '--node-background': nodeData.color ?? 'var(--theme-node-surface, #eff6ff)',
-          '--node-border': colors.border,
-          '--node-icon': colors.icon,
-          '--node-label-color': 'var(--theme-node-label)',
-          '--node-glow': colors.glow,
-          '--node-shadow': colors.shadow,
-          '--node-shadow-hover': colors.shadowHover,
-        } as React.CSSProperties
-      }
+      style={nodeStyle}
     >
       <svg
         className="node-document-svg__shape"

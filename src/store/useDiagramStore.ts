@@ -162,39 +162,48 @@ const useDiagramStore = create<DiagramStore>()((set, get) => ({
   },
 
   updateNodeDimensions: (nodeId, dimensions) => {
-    set({
-      nodes: get().nodes.map((node) => {
-        if (node.id !== nodeId) {
-          return node;
-        }
+    const nodes = get().nodes;
+    const index = nodes.findIndex((n) => n.id === nodeId);
+    if (index === -1) return;
 
-        const width = Math.round(dimensions.width);
-        const height = Math.round(dimensions.height);
+    const node = nodes[index];
+    const width = Math.round(dimensions.width);
+    const height = Math.round(dimensions.height);
+    const x = dimensions.x ?? node.position.x;
+    const y = dimensions.y ?? node.position.y;
 
-        return {
-          ...node,
-          width,
-          height,
-          position: {
-            x: dimensions.x ?? node.position.x,
-            y: dimensions.y ?? node.position.y,
-          },
-          data: {
-            ...node.data,
-            width,
-            height,
-          },
-        };
-      }),
-    });
+    // Skip update if nothing changed to avoid unnecessary store writes and re-renders
+    if (
+      node.width === width &&
+      node.height === height &&
+      node.position.x === x &&
+      node.position.y === y &&
+      node.data.width === width &&
+      node.data.height === height
+    ) {
+      return;
+    }
+
+    // Structural sharing: Only create a new array and new object for the updated node.
+    // All other nodes will keep their original object references.
+    const nextNodes = [...nodes];
+    nextNodes[index] = {
+      ...node,
+      width,
+      height,
+      position: { x, y },
+      data: {
+        ...node.data,
+        width,
+        height,
+      },
+    };
+
+    set({ nodes: nextNodes });
   },
 
   updateNodeColor: (nodeId, color) => {
-    set({
-      nodes: get().nodes.map((node) =>
-        node.id === nodeId ? { ...node, data: { ...node.data, color } } : node,
-      ),
-    });
+    get().updateNode(nodeId, { color });
   },
 
   updateNodeType: (nodeId, type) => {
@@ -237,13 +246,16 @@ const useDiagramStore = create<DiagramStore>()((set, get) => ({
       return;
     }
 
+    const nodeIdSet = new Set(nodeIds);
+    const edgeIdSet = new Set(edgeIds);
+
     set({
-      nodes: get().nodes.filter((node) => !nodeIds.includes(node.id)),
+      nodes: get().nodes.filter((node) => !nodeIdSet.has(node.id)),
       edges: get().edges.filter(
         (edge) =>
-          !edgeIds.includes(edge.id) &&
-          !nodeIds.includes(edge.source) &&
-          !nodeIds.includes(edge.target),
+          !edgeIdSet.has(edge.id) &&
+          !nodeIdSet.has(edge.source) &&
+          !nodeIdSet.has(edge.target),
       ),
     });
   },
@@ -255,7 +267,8 @@ const useDiagramStore = create<DiagramStore>()((set, get) => ({
 
     const { nodes, edges } = get();
     const offset = options?.offset ?? { x: DUPLICATE_OFFSET, y: DUPLICATE_OFFSET };
-    const selectedNodes = nodes.filter((node) => nodeIds.includes(node.id));
+    const nodeIdSet = new Set(nodeIds);
+    const selectedNodes = nodes.filter((node) => nodeIdSet.has(node.id));
     const duplicates = selectedNodes.map((node) => createDuplicateNode(node, offset));
     const idMap = new Map<string, string>();
 
@@ -264,7 +277,7 @@ const useDiagramStore = create<DiagramStore>()((set, get) => ({
     });
 
     const duplicateEdges = edges
-      .filter((edge) => nodeIds.includes(edge.source) && nodeIds.includes(edge.target))
+      .filter((edge) => nodeIdSet.has(edge.source) && nodeIdSet.has(edge.target))
       .map((edge) => ({
         ...cloneEdge(edge),
         id: uuidv4(),
@@ -274,8 +287,8 @@ const useDiagramStore = create<DiagramStore>()((set, get) => ({
       }));
 
     set({
-      nodes: [...nodes.map((node) => ({ ...node, selected: false })), ...duplicates],
-      edges: [...edges.map((edge) => ({ ...edge, selected: false })), ...duplicateEdges],
+      nodes: [...nodes.map((node) => (node.selected ? { ...node, selected: false } : node)), ...duplicates],
+      edges: [...edges.map((edge) => (edge.selected ? { ...edge, selected: false } : edge)), ...duplicateEdges],
     });
 
     return { newNodeIds: duplicates.map((node) => node.id) };
@@ -302,9 +315,11 @@ const useDiagramStore = create<DiagramStore>()((set, get) => ({
       return;
     }
 
+    const nodeIdSet = new Set(nodeIds);
+
     set({
       nodes: get().nodes.map((node) =>
-        nodeIds.includes(node.id)
+        nodeIdSet.has(node.id)
           ? {
               ...node,
               position: {

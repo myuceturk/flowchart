@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -9,6 +9,9 @@ import './edges.css';
 import EdgeActionToolbar from './EdgeActionToolbar';
 import { createTransition } from '../utils/animations';
 import useUIStore from '../store/useUIStore';
+
+// Computed once at module load — same args every call, so hoisting is safe.
+const EDGE_TRANSITION = createTransition(['stroke', 'stroke-width', 'filter']);
 
 /**
  * LabeledEdge — Custom edge component with a centered label.
@@ -33,31 +36,44 @@ const LabeledEdge: React.FC<CustomEdgeProps> = ({
   markerEnd,
   data,
 }) => {
-  const [edgePath, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-  });
+  const [edgePath, labelX, labelY] = useMemo(
+    () => getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition }),
+    [sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition],
+  );
 
-  const onLabelClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    useUIStore.getState().setSelectedEdgeIds([id]);
-  };
+  const edgeStyle = useMemo(
+    () => ({
+      ...style,
+      strokeDasharray: data?.animated ? '8 6' : style?.strokeDasharray,
+      animation: data?.animated ? 'edge-flow 1.4s linear infinite' : style?.animation,
+      transition: EDGE_TRANSITION,
+    }),
+    [style, data?.animated],
+  );
+
+  const labelContainerStyle = useMemo<React.CSSProperties>(
+    () => ({
+      position: 'absolute',
+      transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+      pointerEvents: 'all',
+    }),
+    [labelX, labelY],
+  );
+
+  const onLabelClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      useUIStore.getState().setSelectedEdgeIds([id]);
+    },
+    [id],
+  );
 
   return (
     <>
       <BaseEdge
         path={edgePath}
         markerEnd={markerEnd}
-        style={{
-          ...style,
-          strokeDasharray: data?.animated ? '8 6' : style?.strokeDasharray,
-          animation: data?.animated ? 'edge-flow 1.4s linear infinite' : style?.animation,
-          transition: createTransition(['stroke', 'stroke-width', 'filter']),
-        }}
+        style={edgeStyle}
       />
       <EdgeActionToolbar
         id={id}
@@ -67,18 +83,8 @@ const LabeledEdge: React.FC<CustomEdgeProps> = ({
       />
       {data?.label && (
         <EdgeLabelRenderer>
-          <div
-            style={{
-              position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-              pointerEvents: 'all',
-            }}
-            className="nodrag nopan"
-          >
-            <div
-              className="edge-label"
-              onClick={onLabelClick}
-            >
+          <div style={labelContainerStyle} className="nodrag nopan">
+            <div className="edge-label" onClick={onLabelClick}>
               {data.label}
             </div>
           </div>

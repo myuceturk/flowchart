@@ -21,6 +21,14 @@ const COLORS = [
   { name: 'Gray', value: '#f3f4f6', hex: '#94a3b8' },
 ];
 
+// Style objects depend only on the static COLORS array, so compute them once
+// at module load instead of allocating 6 new objects on every toolbar render.
+const COLOR_BUTTON_STYLES: React.CSSProperties[] = COLORS.map((c) => ({
+  backgroundColor: c.hex,
+  opacity: c.value === null ? 0.3 : 1,
+  border: c.value === null ? '1px dashed #666' : '2px solid white',
+}));
+
 const NodeActionToolbar: React.FC<NodeActionToolbarProps> = ({ id, type, data }) => {
   const setSelectedNodeIds = useUIStore((state) => state.setSelectedNodeIds);
   const {
@@ -79,15 +87,11 @@ const NodeActionToolbar: React.FC<NodeActionToolbarProps> = ({ id, type, data })
       className="node-context-toolbar"
     >
       <div className="toolbar-group">
-        {COLORS.map((c) => (
+        {COLORS.map((c, i) => (
           <button
             key={c.name}
             className={`color-picker-btn ${data.color === c.value ? 'active' : ''}`}
-            style={{
-              backgroundColor: c.hex,
-              opacity: c.value === null ? 0.3 : 1,
-              border: c.value === null ? '1px dashed #666' : '2px solid white'
-            }}
+            style={COLOR_BUTTON_STYLES[i]}
             onClick={() => handleColorChange(c.value)}
             title={c.name}
           />

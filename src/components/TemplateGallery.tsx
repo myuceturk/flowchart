@@ -26,7 +26,15 @@ const categoryIcons: Record<string, string> = {
   blank: '\u2B1C',
 };
 
-function MiniPreview({ template }: { template: DiagramTemplate }) {
+// React.memo prevents re-rendering when the parent re-renders due to search/category
+// changes that don't affect this specific template's data.
+const MiniPreview = React.memo(function MiniPreview({ template }: { template: DiagramTemplate }) {
+  // Stable Map — rebuilt only when template.nodes reference changes.
+  const nodeMap = useMemo(
+    () => new Map(template.nodes.map((n) => [n.id, n])),
+    [template.nodes],
+  );
+
   if (template.nodes.length === 0) {
     return (
       <div className="tg-preview tg-preview--empty">
@@ -47,8 +55,6 @@ function MiniPreview({ template }: { template: DiagramTemplate }) {
   const rangeY = maxY - minY + padY * 2 || 1;
 
   const viewBox = `${minX - padX} ${minY - padY} ${rangeX} ${rangeY}`;
-
-  const nodeMap = new Map(template.nodes.map((n) => [n.id, n]));
 
   return (
     <div className="tg-preview">
@@ -95,7 +101,7 @@ function MiniPreview({ template }: { template: DiagramTemplate }) {
       </svg>
     </div>
   );
-}
+});
 
 const TemplateGallery: React.FC<TemplateGalleryProps> = ({ open, onClose }) => {
   const setDiagram = useDiagramStore((state) => state.setDiagram);

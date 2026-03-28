@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useCallback } from 'react';
 
 type SidebarCategoryProps = {
   id: string;
@@ -21,6 +21,10 @@ const SidebarCategory: React.FC<SidebarCategoryProps> = ({
 }) => {
   const isOpen = collapsed || expanded;
 
+  // Stable wrapper so the trigger button doesn't get a new function reference
+  // on every SidebarCategory render when onToggle and id haven't changed.
+  const handleTriggerClick = useCallback(() => onToggle(id), [onToggle, id]);
+
   if (collapsed) {
     return (
       <section className="sidebar-category sidebar-category--collapsed is-open" aria-label={title}>
@@ -39,7 +43,7 @@ const SidebarCategory: React.FC<SidebarCategoryProps> = ({
       <button
         type="button"
         className="sidebar-category__trigger"
-        onClick={() => onToggle(id)}
+        onClick={handleTriggerClick}
         aria-expanded={isOpen}
         aria-controls={`sidebar-category-${id}`}
         title={collapsed ? title : undefined}

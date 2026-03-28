@@ -33,9 +33,8 @@ const NodeShell: React.FC<NodeShellProps> = ({
   contentClassName,
 }) => {
   const { updateNodeData } = useDiagramCommands();
-  const { selectedNodeIds, selectedEdgeIds, isEditingLabel, setEditingLabel } = useNodeEditingState();
+  const { isSingleNodeSelected, isEditingLabel, setEditingLabel } = useNodeEditingState();
   const nodeData = useNodeData(id) ?? data;
-  const isSingleNodeSelected = selectedNodeIds.length === 1 && selectedEdgeIds.length === 0;
   const definition = getPluginNodeDefinition(nodeType);
   const [isEditing, setIsEditing] = useState(false);
   const [innerLabel, setInnerLabel] = useState(nodeData.label || labelPlaceholder);
