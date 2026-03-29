@@ -4,45 +4,41 @@ import { saveAutosavedDiagram } from '../app/services/diagramPersistence';
 import useDiagramStore from '../store/useDiagramStore';
 
 const SAVE_DEBOUNCE_MS = 500;
+const SAVE_INDICATOR_MS = 900;
 
 export function useAutoSave(enabled = true) {
-  const { nodes, edges, setSaving } = useDiagramStore(
+  const { nodes, edges, setSaveStatus } = useDiagramStore(
     useShallow((state) => ({
       nodes: state.nodes,
       edges: state.edges,
-      setSaving: state.setSaving,
+      setSaveStatus: state.setSaveStatus,
     })),
   );
   const timeoutRef = useRef<number | null>(null);
-  const saveIndicatorRef = useRef<number | null>(null);
+  const indicatorRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!enabled) {
       return;
     }
 
-    if (timeoutRef.current) {
-      window.clearTimeout(timeoutRef.current);
-    }
+    if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+    if (indicatorRef.current) window.clearTimeout(indicatorRef.current);
 
-    if (saveIndicatorRef.current) {
-      window.clearTimeout(saveIndicatorRef.current);
-    }
+    setSaveStatus('saving');
 
-    setSaving(true);
     timeoutRef.current = window.setTimeout(() => {
-      saveAutosavedDiagram({ nodes, edges });
-      saveIndicatorRef.current = window.setTimeout(() => setSaving(false), 900);
+      try {
+        saveAutosavedDiagram({ nodes, edges });
+        indicatorRef.current = window.setTimeout(() => setSaveStatus('saved'), SAVE_INDICATOR_MS);
+      } catch {
+        setSaveStatus('error');
+      }
     }, SAVE_DEBOUNCE_MS);
 
     return () => {
-      if (timeoutRef.current) {
-        window.clearTimeout(timeoutRef.current);
-      }
-
-      if (saveIndicatorRef.current) {
-        window.clearTimeout(saveIndicatorRef.current);
-      }
+      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+      if (indicatorRef.current) window.clearTimeout(indicatorRef.current);
     };
-  }, [enabled, nodes, edges, setSaving]);
+  }, [enabled, nodes, edges, setSaveStatus]);
 }

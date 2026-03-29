@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { loadInstalledPlugins } from '../../plugins/pluginSystem';
 import { loadAutosavedDiagram, loadDiagramFromApi } from '../services/diagramPersistence';
 import useDiagramStore from '../../store/useDiagramStore';
 
 export function useDiagramBootstrap() {
-  const { setDiagram, setDiagramId } = useDiagramStore(
+  const { id } = useParams<{ id: string }>();
+
+  const { setDiagram, setDiagramId, setDiagramTitle } = useDiagramStore(
     useShallow((state) => ({
       setDiagram: state.setDiagram,
       setDiagramId: state.setDiagramId,
+      setDiagramTitle: state.setDiagramTitle,
     })),
   );
   const [loading, setLoading] = useState(true);
@@ -31,9 +35,6 @@ export function useDiagramBootstrap() {
     let cancelled = false;
 
     async function bootstrapDiagram() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const id = urlParams.get('id');
-
       try {
         if (id) {
           const remoteDiagram = await loadDiagramFromApi(id);
@@ -41,6 +42,7 @@ export function useDiagramBootstrap() {
           if (remoteDiagram && !cancelled) {
             setDiagram(remoteDiagram.nodes, remoteDiagram.edges);
             setDiagramId(remoteDiagram.id ?? id);
+            setDiagramTitle(remoteDiagram.title ?? null);
             return;
           }
         }
@@ -64,7 +66,7 @@ export function useDiagramBootstrap() {
     return () => {
       cancelled = true;
     };
-  }, [setDiagram, setDiagramId]);
+  }, [id, setDiagram, setDiagramId, setDiagramTitle]);
 
   return { loading };
 }

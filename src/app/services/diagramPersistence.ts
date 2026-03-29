@@ -8,6 +8,7 @@ const DIAGRAM_API_BASE_URL = API_URL;
 
 export type DiagramPayload = {
   id?: string;
+  title?: string;
   nodes: Node<NodeData>[];
   edges: Edge[];
 };
@@ -61,6 +62,7 @@ export async function loadDiagramFromApi(id: string): Promise<DiagramPayload | n
 
   return {
     id: data.id ?? id,
+    title: data.title,
     nodes: (data.nodes ?? []) as Node<NodeData>[],
     edges: data.edges ?? [],
   };

@@ -23,11 +23,15 @@ export interface DiagramSnapshot {
   edges: Edge[];
 }
 
+export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
 export interface DiagramStore {
   nodes: Node<NodeData>[];
   edges: Edge[];
   diagramId: string | null;
+  diagramTitle: string | null;
   isSaving: boolean;
+  saveStatus: SaveStatus;
 
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
@@ -60,12 +64,14 @@ export interface DiagramStore {
   nudgeNodes: (nodeIds: string[], dx: number, dy: number) => void;
 
   setDiagramId: (id: string | null) => void;
+  setDiagramTitle: (title: string | null) => void;
   setDiagram: (nodes: Node<NodeData>[], edges: Edge[]) => void;
 
   replaceFromSnapshot: (snapshot: DiagramSnapshot) => void;
   createSnapshot: () => DiagramSnapshot;
 
   setSaving: (isSaving: boolean) => void;
+  setSaveStatus: (status: SaveStatus) => void;
   clearDiagram: () => void;
 }
 

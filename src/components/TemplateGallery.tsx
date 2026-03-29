@@ -16,6 +16,8 @@ import './TemplateGallery.css';
 interface TemplateGalleryProps {
   open: boolean;
   onClose: () => void;
+  /** When provided, called instead of applying the template to the current diagram. */
+  onSelect?: (template: DiagramTemplate) => void;
 }
 
 const categoryIcons: Record<string, string> = {
@@ -106,7 +108,7 @@ const MiniPreview = React.memo(function MiniPreview({ template }: { template: Di
   );
 });
 
-const TemplateGallery: React.FC<TemplateGalleryProps> = ({ open, onClose }) => {
+const TemplateGallery: React.FC<TemplateGalleryProps> = ({ open, onClose, onSelect }) => {
   const setDiagram = useDiagramStore((state) => state.setDiagram);
   const [activeCategory, setActiveCategory] = useState<TemplateCategory>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -129,6 +131,11 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ open, onClose }) => {
 
   const handleSelect = useCallback(
     (template: DiagramTemplate) => {
+      if (onSelect) {
+        onSelect(template);
+        onClose();
+        return;
+      }
       useHistoryStore.getState().pushSnapshot(useDiagramStore.getState().createSnapshot());
       const enrichedNodes = template.nodes.map((node) => {
         const defaults = getDefaultNodeData((node.type ?? 'process') as AppNodeType);
@@ -145,7 +152,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ open, onClose }) => {
       setDiagram(enrichedNodes, [...template.edges]);
       onClose();
     },
-    [setDiagram, onClose],
+    [onSelect, setDiagram, onClose],
   );
 
   // Reset search when modal opens

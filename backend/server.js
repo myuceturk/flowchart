@@ -55,7 +55,7 @@ app.use(
       if (allowedOrigins.includes(origin)) return callback(null, true);
       callback(new Error(`CORS: origin '${origin}' not allowed`));
     },
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
   }),
@@ -153,7 +153,7 @@ app.get('/diagram/:id', validateDiagramId, (req, res) => {
     const diagram = getDiagram(req.params.id);
     if (!diagram) return res.status(404).json({ error: 'Diagram not found' });
     if (!canAccess(diagram, req)) return res.status(403).json({ error: 'Access denied' });
-    res.status(200).json({ id: diagram.id, ...diagram.data });
+    res.status(200).json({ id: diagram.id, title: diagram.title ?? '', ...diagram.data });
   } catch (err) {
     logger.error({ err }, 'GET /diagram/:id error');
     res.status(500).json({ error: 'Failed to retrieve diagram' });
@@ -211,6 +211,7 @@ app.get('/diagrams', (req, res) => {
       diagrams.map((d) => ({
         id: d.id,
         title: d.title,
+        nodeCount: Array.isArray(d.data?.nodes) ? d.data.nodes.length : 0,
         created_at: d.created_at,
         updated_at: d.updated_at,
       })),
@@ -218,6 +219,40 @@ app.get('/diagrams', (req, res) => {
   } catch (err) {
     logger.error({ err }, 'GET /diagrams error');
     res.status(500).json({ error: 'Failed to list diagrams' });
+  }
+});
+
+// DELETE /diagrams/:id — delete a diagram (dashboard route)
+app.delete('/diagrams/:id', validateDiagramId, (req, res) => {
+  try {
+    const diagram = getDiagram(req.params.id);
+    if (!diagram) return res.status(404).json({ error: 'Diagram not found' });
+    if (!canAccess(diagram, req)) return res.status(403).json({ error: 'Access denied' });
+    deleteDiagram(req.params.id);
+    logger.info({ diagramId: req.params.id }, 'Deleted diagram (dashboard)');
+    res.status(200).json({ message: 'Diagram deleted' });
+  } catch (err) {
+    logger.error({ err }, 'DELETE /diagrams/:id error');
+    res.status(500).json({ error: 'Failed to delete diagram' });
+  }
+});
+
+// PATCH /diagrams/:id/title — update only the title
+app.patch('/diagrams/:id/title', validateDiagramId, (req, res) => {
+  try {
+    const { title } = req.body;
+    if (typeof title !== 'string' || title.trim().length === 0) {
+      return res.status(400).json({ error: 'title is required' });
+    }
+    const diagram = getDiagram(req.params.id);
+    if (!diagram) return res.status(404).json({ error: 'Diagram not found' });
+    if (!canAccess(diagram, req)) return res.status(403).json({ error: 'Access denied' });
+    const updated = updateDiagram(req.params.id, { title: title.trim() });
+    logger.info({ diagramId: req.params.id }, 'Renamed diagram');
+    res.status(200).json({ id: updated.id, title: updated.title });
+  } catch (err) {
+    logger.error({ err }, 'PATCH /diagrams/:id/title error');
+    res.status(500).json({ error: 'Failed to rename diagram' });
   }
 });
 

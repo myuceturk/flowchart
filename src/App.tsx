@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from 'react';
+import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import * as Sentry from '@sentry/react';
 import { ReactFlowProvider } from 'reactflow';
 import { useShallow } from 'zustand/react/shallow';
@@ -8,6 +9,10 @@ import Header from './components/Header';
 import TemplateGallery from './components/TemplateGallery';
 import AuthModal from './components/AuthModal';
 import ErrorFallback from './components/ErrorFallback';
+import ProtectedRoute from './components/ProtectedRoute';
+import LandingPage from './pages/LandingPage';
+import AuthPage from './pages/AuthPage';
+import DashboardPage from './pages/DashboardPage';
 import { useAutoSave } from './hooks/useAutoSave';
 import { useDiagramBootstrap } from './app/hooks/useDiagramBootstrap';
 import { animationCssVariables } from './utils/animations';
@@ -19,11 +24,11 @@ import './index.css';
 
 const ONBOARDING_KEY = 'fdb_onboarding_shown';
 
-function App() {
+// ─── Canvas / diagram workspace ───────────────────────────────────────────────
+function DiagramApp() {
   const { loading } = useDiagramBootstrap();
   useAutoSave(!loading);
 
-  // ─── Collaboration session ──────────────────────────────────────────────────
   const { isAuthenticated, user, token } = useAuthStore(
     useShallow((s) => ({ isAuthenticated: s.isAuthenticated, user: s.user, token: s.token })),
   );
@@ -39,15 +44,11 @@ function App() {
         disconnectCollab();
       };
     }
-    // Not authenticated or no diagram — ensure any previous session is torn down
     disconnectCollab();
   }, [isAuthenticated, user, token, diagramId, connectCollab, disconnectCollab]);
 
-  // Subscribe to a boolean, not the full nodes array — App no longer re-renders
-  // on every node edit, only when the diagram transitions between empty/non-empty.
   const hasNodes = useDiagramStore((state) => state.nodes.length > 0);
 
-  // Merge into one subscription so only one store listener is registered.
   const { isTemplateGalleryOpen, setTemplateGalleryOpen } = useUIStore(
     useShallow((state) => ({
       isTemplateGalleryOpen: state.isTemplateGalleryOpen,
@@ -55,7 +56,6 @@ function App() {
     })),
   );
 
-  // Stable reference so TemplateGallery's React.memo is not bypassed on re-renders.
   const handleCloseTemplateGallery = useCallback(
     () => setTemplateGalleryOpen(false),
     [setTemplateGalleryOpen],
@@ -67,7 +67,6 @@ function App() {
     });
   }, []);
 
-  // Show template gallery on first visit when canvas is empty
   useEffect(() => {
     if (loading) return;
     const alreadyShown = localStorage.getItem(ONBOARDING_KEY);
@@ -98,17 +97,96 @@ function App() {
   );
 }
 
+// ─── Root route: redirect authenticated users, show landing page otherwise ────
+function RootRoute() {
+  const authInitialized = useAuthStore((s) => s.authInitialized);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
+  if (!authInitialized) {
+    return <div className="app-loading">Loading…</div>;
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/app" replace />;
+  }
+
+  return <LandingPage />;
+}
+
+// ─── Auth route: redirect authenticated users away from login/register ─────────
+function AuthRoute() {
+  const authInitialized = useAuthStore((s) => s.authInitialized);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
+  if (!authInitialized) {
+    return <div className="app-loading">Loading…</div>;
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/app" replace />;
+  }
+
+  return <AuthPage />;
+}
+
+// ─── Forgot password placeholder ──────────────────────────────────────────────
+function ForgotPasswordPage() {
+  return (
+    <div className="ap-coming-soon">
+      <div className="ap-coming-soon__card">
+        <h2>Şifre Sıfırlama</h2>
+        <p>Bu özellik yakında kullanıma açılacak.</p>
+        <Link to="/login">Giriş sayfasına dön</Link>
+      </div>
+    </div>
+  );
+}
+
+// ─── App router ───────────────────────────────────────────────────────────────
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<RootRoute />} />
+      <Route path="/login" element={<AuthRoute />} />
+      <Route path="/register" element={<AuthRoute />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route
+        path="/app"
+        element={
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/app/diagram/:id"
+        element={
+          <ProtectedRoute>
+            <DiagramApp />
+          </ProtectedRoute>
+        }
+      />
+      {/* Catch-all */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+// ─── Error boundary wrapper ───────────────────────────────────────────────────
 function AppWithErrorBoundary() {
-  const { user } = useAuthStore((s) => ({ user: s.user }));
+  const user = useAuthStore((s) => s.user);
 
   return (
     <Sentry.ErrorBoundary
       fallback={({ error, componentStack, eventId }) => (
-        <ErrorFallback error={error as Error} componentStack={componentStack ?? undefined} eventId={eventId ?? undefined} />
+        <ErrorFallback
+          error={error as Error}
+          componentStack={componentStack ?? undefined}
+          eventId={eventId ?? undefined}
+        />
       )}
       beforeCapture={(scope) => {
         if (user) {
-          // Only set a non-identifying user id — no email or PII
           scope.setUser({ id: user.id });
         }
       }}

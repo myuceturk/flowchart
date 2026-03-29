@@ -1,16 +1,19 @@
 import React, { useCallback, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import useAuthStore from '../store/useAuthStore';
 import './AuthModal.css';
 
 type Tab = 'login' | 'register';
 
 const AuthModal: React.FC = () => {
-  const { isAuthModalOpen, closeAuthModal, login, register } = useAuthStore((s) => ({
-    isAuthModalOpen: s.isAuthModalOpen,
-    closeAuthModal: s.closeAuthModal,
-    login: s.login,
-    register: s.register,
-  }));
+  const { isAuthModalOpen, closeAuthModal, login, register } = useAuthStore(
+    useShallow((s) => ({
+      isAuthModalOpen: s.isAuthModalOpen,
+      closeAuthModal: s.closeAuthModal,
+      login: s.login,
+      register: s.register,
+    })),
+  );
 
   const [tab, setTab] = useState<Tab>('login');
   const [email, setEmail] = useState('');

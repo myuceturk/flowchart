@@ -1,0 +1,484 @@
+/* ─── AuthPage layout ─────────────────────────────────────────────────────── */
+
+.auth-page {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--theme-bg);
+}
+
+/* ─── Left brand panel ────────────────────────────────────────────────────── */
+
+.ap-brand {
+  position: relative;
+  width: 42%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #7c3aed 100%);
+  overflow: hidden;
+}
+
+.ap-brand__inner {
+  position: relative;
+  z-index: 1;
+  padding: 48px 40px;
+  max-width: 380px;
+}
+
+.ap-brand__logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 40px;
+}
+
+.ap-logo-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.ap-brand__name {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.3px;
+}
+
+.ap-brand__tagline {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #fff;
+  margin: 0 0 36px;
+  letter-spacing: -0.5px;
+}
+
+.ap-brand__features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ap-brand__feature {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.ap-brand__feature-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  width: 32px;
+  text-align: center;
+}
+
+/* Decorative blurred circle in brand panel */
+.ap-brand__decoration {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ap-brand__decoration::before {
+  content: '';
+  position: absolute;
+  bottom: -80px;
+  right: -80px;
+  width: 360px;
+  height: 360px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 50%;
+}
+
+.ap-brand__decoration::after {
+  content: '';
+  position: absolute;
+  top: -60px;
+  left: -60px;
+  width: 240px;
+  height: 240px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 50%;
+}
+
+/* ─── Right form panel ────────────────────────────────────────────────────── */
+
+.ap-form-panel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 32px 24px;
+  background: var(--theme-surface);
+}
+
+.ap-card {
+  width: 100%;
+  max-width: 400px;
+}
+
+/* ─── Tabs ────────────────────────────────────────────────────────────────── */
+
+.ap-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--theme-bg);
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 24px;
+}
+
+.ap-tab {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--theme-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--motion-duration-fast) var(--motion-easing-standard),
+    color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.ap-tab:hover:not(.ap-tab--active) {
+  color: var(--theme-text);
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.ap-tab--active {
+  background: var(--theme-surface);
+  color: var(--theme-text);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.10);
+}
+
+/* ─── Error ───────────────────────────────────────────────────────────────── */
+
+.ap-error {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 13.5px;
+  line-height: 1.4;
+  margin-bottom: 16px;
+}
+
+/* ─── Form ────────────────────────────────────────────────────────────────── */
+
+.ap-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ap-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ap-field__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ap-label {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--theme-text);
+}
+
+.ap-input {
+  height: 42px;
+  padding: 0 12px;
+  border: 1.5px solid var(--theme-border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--theme-text);
+  background: var(--theme-surface);
+  outline: none;
+  transition: border-color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.ap-input:hover:not(:disabled) {
+  border-color: rgba(148, 163, 184, 0.5);
+}
+
+.ap-input:focus {
+  border-color: var(--theme-primary);
+}
+
+.ap-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ─── Password strength ───────────────────────────────────────────────────── */
+
+.ap-strength {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.ap-strength__bars {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+.ap-strength__seg {
+  height: 4px;
+  flex: 1;
+  border-radius: 2px;
+  background: rgba(148, 163, 184, 0.25);
+  transition: background var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.ap-strength__seg--weak {
+  background: #ef4444;
+}
+
+.ap-strength__seg--medium {
+  background: #f59e0b;
+}
+
+.ap-strength__seg--strong {
+  background: #22c55e;
+}
+
+.ap-strength__label {
+  font-size: 12px;
+  font-weight: 500;
+  min-width: 32px;
+  text-align: right;
+}
+
+.ap-strength__label--weak  { color: #ef4444; }
+.ap-strength__label--medium { color: #f59e0b; }
+.ap-strength__label--strong { color: #22c55e; }
+
+/* ─── Checkbox ────────────────────────────────────────────────────────────── */
+
+.ap-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13.5px;
+  color: var(--theme-text);
+  line-height: 1.4;
+}
+
+.ap-checkbox input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  accent-color: var(--theme-primary);
+  cursor: pointer;
+}
+
+.ap-checkbox input:disabled {
+  cursor: not-allowed;
+}
+
+/* ─── Links ───────────────────────────────────────────────────────────────── */
+
+.ap-link {
+  color: var(--theme-primary);
+  text-decoration: none;
+  font-size: 13.5px;
+}
+
+.ap-link:hover {
+  text-decoration: underline;
+}
+
+.ap-link--sm {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+/* ─── Submit button ───────────────────────────────────────────────────────── */
+
+.ap-submit {
+  height: 44px;
+  border: none;
+  border-radius: 9px;
+  background: var(--theme-primary);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    background var(--motion-duration-fast) var(--motion-easing-standard),
+    opacity var(--motion-duration-fast) var(--motion-easing-standard),
+    transform var(--motion-duration-fast) var(--motion-easing-standard);
+  margin-top: 4px;
+}
+
+.ap-submit:hover:not(:disabled) {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.ap-submit:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.ap-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ─── Divider ─────────────────────────────────────────────────────────────── */
+
+.ap-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--theme-text-muted);
+  font-size: 12.5px;
+}
+
+.ap-divider::before,
+.ap-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--theme-border);
+}
+
+/* ─── Google button ───────────────────────────────────────────────────────── */
+
+.ap-google-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ap-google {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 44px;
+  border: 1.5px solid var(--theme-border);
+  border-radius: 9px;
+  background: var(--theme-surface);
+  color: var(--theme-text);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.ap-soon-badge {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: 20px;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--theme-primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ─── Responsive: hide brand panel on small screens ──────────────────────── */
+
+@media (max-width: 768px) {
+  .ap-brand {
+    display: none;
+  }
+
+  .ap-form-panel {
+    background: var(--theme-bg);
+  }
+
+  .ap-card {
+    max-width: 360px;
+  }
+}
+
+@media (max-width: 480px) {
+  .ap-form-panel {
+    padding: 24px 16px;
+    align-items: flex-start;
+    padding-top: 40px;
+  }
+
+  .ap-card {
+    max-width: 100%;
+  }
+}
+
+/* ─── Forgot password / coming soon page ─────────────────────────────────── */
+
+.ap-coming-soon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100vw;
+  height: 100vh;
+  background: var(--theme-bg);
+}
+
+.ap-coming-soon__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 48px;
+  background: var(--theme-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--panel-shadow);
+  text-align: center;
+}
+
+.ap-coming-soon__card h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--theme-text);
+}
+
+.ap-coming-soon__card p {
+  margin: 0;
+  font-size: 15px;
+  color: var(--theme-text-muted);
+}
+
+.ap-coming-soon__card a {
+  color: var(--theme-primary);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  margin-top: 4px;
+}
+
+.ap-coming-soon__card a:hover {
+  text-decoration: underline;
+}

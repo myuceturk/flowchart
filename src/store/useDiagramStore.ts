@@ -65,7 +65,9 @@ const useDiagramStore = create<DiagramStore>()((set, get) => ({
   nodes: initialNodes,
   edges: [],
   diagramId: null,
+  diagramTitle: null,
   isSaving: false,
+  saveStatus: 'idle' as const,
 
   onNodesChange: (changes: NodeChange[]) => {
     set({
@@ -407,6 +409,8 @@ const useDiagramStore = create<DiagramStore>()((set, get) => ({
 
   setDiagramId: (diagramId) => set({ diagramId }),
 
+  setDiagramTitle: (diagramTitle) => set({ diagramTitle }),
+
   setDiagram: (nodes, edges) =>
     set({
       nodes,
@@ -425,6 +429,8 @@ const useDiagramStore = create<DiagramStore>()((set, get) => ({
   }),
 
   setSaving: (isSaving) => set({ isSaving }),
+
+  setSaveStatus: (saveStatus) => set({ saveStatus }),
 
   clearDiagram: () =>
     set({
