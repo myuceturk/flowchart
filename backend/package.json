@@ -11,9 +11,12 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "better-sqlite3": "^11.10.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
-    "uuid": "^13.0.0"
+    "jsonwebtoken": "^9.0.3",
+    "uuid": "^13.0.0",
+    "ws": "^8.20.0"
   }
 }

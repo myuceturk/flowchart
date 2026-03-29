@@ -5,11 +5,14 @@ import Canvas from './components/Canvas';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import TemplateGallery from './components/TemplateGallery';
+import AuthModal from './components/AuthModal';
 import { useAutoSave } from './hooks/useAutoSave';
 import { useDiagramBootstrap } from './app/hooks/useDiagramBootstrap';
 import { animationCssVariables } from './utils/animations';
 import useDiagramStore from './store/useDiagramStore';
 import useUIStore from './store/useUIStore';
+import useAuthStore from './store/useAuthStore';
+import useCollaborationStore from './store/useCollaborationStore';
 import './index.css';
 
 const ONBOARDING_KEY = 'fdb_onboarding_shown';
@@ -17,6 +20,26 @@ const ONBOARDING_KEY = 'fdb_onboarding_shown';
 function App() {
   const { loading } = useDiagramBootstrap();
   useAutoSave(!loading);
+
+  // ─── Collaboration session ──────────────────────────────────────────────────
+  const { isAuthenticated, user, token } = useAuthStore(
+    useShallow((s) => ({ isAuthenticated: s.isAuthenticated, user: s.user, token: s.token })),
+  );
+  const diagramId = useDiagramStore((s) => s.diagramId);
+  const { connect: connectCollab, disconnect: disconnectCollab } = useCollaborationStore(
+    useShallow((s) => ({ connect: s.connect, disconnect: s.disconnect })),
+  );
+
+  useEffect(() => {
+    if (isAuthenticated && user && token && diagramId) {
+      connectCollab(diagramId, user.id, user.email, token);
+      return () => {
+        disconnectCollab();
+      };
+    }
+    // Not authenticated or no diagram — ensure any previous session is torn down
+    disconnectCollab();
+  }, [isAuthenticated, user, token, diagramId, connectCollab, disconnectCollab]);
 
   // Subscribe to a boolean, not the full nodes array — App no longer re-renders
   // on every node edit, only when the diagram transitions between empty/non-empty.
@@ -68,6 +91,7 @@ function App() {
         </ReactFlowProvider>
       </div>
       <TemplateGallery open={isTemplateGalleryOpen} onClose={handleCloseTemplateGallery} />
+      <AuthModal />
     </div>
   );
 }

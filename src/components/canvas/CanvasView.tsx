@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useRef } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -7,6 +7,7 @@ import {
   Panel,
   ReactFlow,
   useReactFlow,
+  useViewport,
   type Edge,
   type Node,
   type OnSelectionChangeParams,
@@ -37,6 +38,58 @@ import { useCanvasKeyboardShortcuts } from './hooks/useCanvasKeyboardShortcuts';
 import { useCanvasNodeDnD } from './hooks/useCanvasNodeDnD';
 import { useNodeAlignmentGuides } from './hooks/useNodeAlignmentGuides';
 import { usePluginCanvasActionContext } from './hooks/usePluginCanvasActionContext';
+import useCollaborationStore from '../../store/useCollaborationStore';
+import type { CollaboratingUser } from '../../store/useCollaborationStore';
+
+// ─── Remote cursor overlay ────────────────────────────────────────────────────
+
+/** Renders other collaborators' cursors as colored dots + name labels. */
+const RemoteCursors: React.FC = () => {
+  const activeUsers = useCollaborationStore((s) => s.activeUsers);
+  const { x: vpX, y: vpY, zoom } = useViewport();
+
+  const usersWithCursor = activeUsers.filter(
+    (u): u is CollaboratingUser & { cursor: NonNullable<CollaboratingUser['cursor']> } =>
+      u.cursor != null,
+  );
+
+  if (usersWithCursor.length === 0) return null;
+
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        position: 'absolute',
+        inset: 0,
+        pointerEvents: 'none',
+        overflow: 'hidden',
+        zIndex: 1000,
+      }}
+    >
+      {usersWithCursor.map((user) => {
+        // Convert flow coordinates → viewport-relative pixel coordinates
+        const sx = user.cursor.x * zoom + vpX;
+        const sy = user.cursor.y * zoom + vpY;
+        return (
+          <div
+            key={user.id}
+            className="remote-cursor"
+            style={{ transform: `translate(${sx}px, ${sy}px)` }}
+          >
+            <div className="remote-cursor__dot" style={{ background: user.color }} />
+            <span className="remote-cursor__label" style={{ background: user.color }}>
+              {user.name}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ─── Canvas constants ─────────────────────────────────────────────────────────
+
+const CURSOR_THROTTLE_MS = 50;
 
 // Module-level constants so ReactFlow receives the same reference on every
 // render instead of new objects, preventing spurious internal ReactFlow work.
@@ -188,6 +241,21 @@ const CanvasView: React.FC = () => {
     screenToFlowPosition,
   });
 
+  // ─── Cursor tracking ───────────────────────────────────────────────────────
+  const lastCursorSendRef = useRef(0);
+  const sendCursorMoved = useCollaborationStore((s) => s.sendCursorMoved);
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      const now = Date.now();
+      if (now - lastCursorSendRef.current < CURSOR_THROTTLE_MS) return;
+      lastCursorSendRef.current = now;
+      const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      sendCursorMoved(pos.x, pos.y);
+    },
+    [screenToFlowPosition, sendCursorMoved],
+  );
+
   // Throttle selection updates to one per animation frame.
   // During a box-select over 500 nodes ReactFlow fires this callback at pointer-move
   // rate (120+ events/sec). Each call maps N node objects to IDs then compares N
@@ -272,6 +340,7 @@ const CanvasView: React.FC = () => {
         onDrop={onDrop}
         onDragOver={onDragOver}
         onSelectionChange={onSelectionChange}
+        onMouseMove={handleMouseMove}
         fitView
         snapToGrid
         snapGrid={SNAP_GRID}
@@ -288,6 +357,7 @@ const CanvasView: React.FC = () => {
         connectionMode={ConnectionMode.Loose}
         onlyRenderVisibleElements={nodes.length > VIEWPORT_CULLING_THRESHOLD}
       >
+        <RemoteCursors />
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color={customTheme.grid} />
         <Controls />
         <SmartMiniMap nodeColor={miniMapNodeColor} />

@@ -6,6 +6,8 @@ import { saveDiagramToApi } from '../app/services/diagramPersistence';
 import { useDiagramCommands } from '../hooks/useDiagramCommands';
 import useDiagramStore from '../store/useDiagramStore';
 import useHistoryStore from '../store/useHistoryStore';
+import useAuthStore from '../store/useAuthStore';
+import useCollaborationStore from '../store/useCollaborationStore';
 import ThemePanel from './ThemePanel';
 import ExportMenu from './ExportMenu';
 import TemplateGallery from './TemplateGallery';
@@ -37,6 +39,17 @@ const Header: React.FC = () => {
       setTheme: state.setTheme,
     })),
   );
+  const { isAuthenticated, user, logout, openAuthModal } = useAuthStore(
+    useShallow((s) => ({
+      isAuthenticated: s.isAuthenticated,
+      user: s.user,
+      logout: s.logout,
+      openAuthModal: s.openAuthModal,
+    })),
+  );
+  const activeUsers = useCollaborationStore((s) => s.activeUsers);
+  const MAX_VISIBLE_AVATARS = 5;
+
   const [isManualSaving, setIsManualSaving] = useState(false);
   const [galleryOpen, setGalleryOpen] = useState(false);
 
@@ -176,6 +189,60 @@ const Header: React.FC = () => {
         >
           {isManualSaving ? 'Updating...' : 'Save Cloud'}
         </button>
+
+        <div className="divider" />
+
+        {isAuthenticated && activeUsers.length > 0 && (
+          <>
+            <div className="collaborator-avatars" role="list" aria-label="Active collaborators">
+              {activeUsers.slice(0, MAX_VISIBLE_AVATARS).map((collaborator) => (
+                <span
+                  key={collaborator.id}
+                  role="listitem"
+                  className="collaborator-avatar"
+                  style={{ background: collaborator.color }}
+                  title={collaborator.name}
+                  aria-label={collaborator.name}
+                >
+                  {collaborator.name[0].toUpperCase()}
+                </span>
+              ))}
+              {activeUsers.length > MAX_VISIBLE_AVATARS && (
+                <span
+                  className="collaborator-overflow"
+                  title={`${activeUsers.length - MAX_VISIBLE_AVATARS} more collaborators`}
+                >
+                  +{activeUsers.length - MAX_VISIBLE_AVATARS}
+                </span>
+              )}
+            </div>
+            <div className="divider" />
+          </>
+        )}
+
+        {isAuthenticated && user ? (
+          <div className="auth-user">
+            <span className="auth-avatar" aria-label={user.email} title={user.email}>
+              {user.email[0].toUpperCase()}
+            </span>
+            <button
+              className="btn-history btn-logout"
+              onClick={logout}
+              aria-label="Sign out"
+              title="Sign out"
+            >
+              Sign Out
+            </button>
+          </div>
+        ) : (
+          <button
+            className="btn-signin"
+            onClick={openAuthModal}
+            aria-label="Sign in"
+          >
+            Sign In
+          </button>
+        )}
 
       </div>
       <TemplateGallery open={galleryOpen} onClose={handleCloseGallery} />

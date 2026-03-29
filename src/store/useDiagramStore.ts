@@ -5,6 +5,7 @@ import {
   applyNodeChanges,
 } from 'reactflow';
 import type { Connection, Edge, EdgeChange, Node, NodeChange } from 'reactflow';
+import * as collaborationService from '../app/services/collaborationService';
 import { v4 as uuidv4 } from 'uuid';
 import type { AlignmentDirection, DiagramSnapshot, DiagramStore } from '../types';
 import {
@@ -70,12 +71,32 @@ const useDiagramStore = create<DiagramStore>()((set, get) => ({
     set({
       nodes: applyNodeChanges(changes, get().nodes),
     });
+    // Broadcast position changes to collaborators (fires during and after drag)
+    if (!collaborationService.isApplyingRemote) {
+      for (const change of changes) {
+        if (change.type === 'position' && change.position) {
+          collaborationService.send({
+            type: 'node_moved',
+            nodeId: change.id,
+            position: change.position,
+          });
+        }
+      }
+    }
   },
 
   onEdgesChange: (changes: EdgeChange[]) => {
     set({
       edges: applyEdgeChanges(changes, get().edges),
     });
+    // Broadcast edge deletions
+    if (!collaborationService.isApplyingRemote) {
+      for (const change of changes) {
+        if (change.type === 'remove') {
+          collaborationService.send({ type: 'edge_deleted', edgeId: change.id });
+        }
+      }
+    }
   },
 
   onConnect: (params: Connection) => {
@@ -130,6 +151,7 @@ const useDiagramStore = create<DiagramStore>()((set, get) => ({
       set({
         edges: reactFlowAddEdge(edgeWithData, edges),
       });
+      collaborationService.send({ type: 'edge_created', edge: edgeWithData as unknown as Record<string, unknown> });
       return true;
     }
 
@@ -146,6 +168,7 @@ const useDiagramStore = create<DiagramStore>()((set, get) => ({
     set({
       edges: reactFlowAddEdge(defaultEdge, edges),
     });
+    collaborationService.send({ type: 'edge_created', edge: defaultEdge as unknown as Record<string, unknown> });
     return true;
   },
 
@@ -165,6 +188,9 @@ const useDiagramStore = create<DiagramStore>()((set, get) => ({
         node.id === nodeId ? { ...node, data: { ...node.data, ...data } } : node,
       ),
     });
+    if (!collaborationService.isApplyingRemote) {
+      collaborationService.send({ type: 'node_updated', nodeId, data: data as Record<string, unknown> });
+    }
   },
 
   updateNodeDimensions: (nodeId, dimensions) => {
@@ -280,16 +306,31 @@ const useDiagramStore = create<DiagramStore>()((set, get) => ({
 
     const nodeIdSet = new Set(nodeIds);
     const edgeIdSet = new Set(edgeIds);
+    const currentEdges = get().edges;
+
+    // Collect all edge IDs that will be deleted (explicit + those attached to deleted nodes)
+    const deletedEdgeIds = new Set<string>(edgeIds);
+    for (const edge of currentEdges) {
+      if (nodeIdSet.has(edge.source) || nodeIdSet.has(edge.target)) {
+        deletedEdgeIds.add(edge.id);
+      }
+    }
 
     set({
       nodes: get().nodes.filter((node) => !nodeIdSet.has(node.id)),
-      edges: get().edges.filter(
+      edges: currentEdges.filter(
         (edge) =>
           !edgeIdSet.has(edge.id) &&
           !nodeIdSet.has(edge.source) &&
           !nodeIdSet.has(edge.target),
       ),
     });
+
+    if (!collaborationService.isApplyingRemote) {
+      for (const edgeId of deletedEdgeIds) {
+        collaborationService.send({ type: 'edge_deleted', edgeId });
+      }
+    }
   },
 
   duplicateNodesAndEdges: (nodeIds, options) => {

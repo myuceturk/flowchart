@@ -11,8 +11,46 @@ export type DiagramPayload = {
   edges: Edge[];
 };
 
+// ─── Auth helpers (read imperatively to avoid circular imports) ───────────────
+
+function getAuthHeaders(): Record<string, string> {
+  try {
+    // Dynamic import avoids circular dependency; store is a singleton so getState works.
+    const { default: useAuthStore } = require('../../store/useAuthStore') as {
+      default: { getState: () => { getAuthHeaders: () => Record<string, string> } };
+    };
+    return useAuthStore.getState().getAuthHeaders();
+  } catch {
+    return {};
+  }
+}
+
+function handleUnauthorized() {
+  try {
+    const { default: useAuthStore } = require('../../store/useAuthStore') as {
+      default: {
+        getState: () => { logout: () => void; openAuthModal: () => void };
+      };
+    };
+    const { logout, openAuthModal } = useAuthStore.getState();
+    logout();
+    openAuthModal();
+  } catch {
+    // Store not available
+  }
+}
+
+// ─── API functions ────────────────────────────────────────────────────────────
+
 export async function loadDiagramFromApi(id: string): Promise<DiagramPayload | null> {
-  const response = await fetch(`${DIAGRAM_API_BASE_URL}/diagram/${id}`);
+  const response = await fetch(`${DIAGRAM_API_BASE_URL}/diagram/${id}`, {
+    headers: { ...getAuthHeaders() },
+  });
+
+  if (response.status === 401 || response.status === 403) {
+    handleUnauthorized();
+    return null;
+  }
 
   if (!response.ok) {
     return null;
@@ -37,13 +75,21 @@ export async function saveDiagramToApi(
       : `${DIAGRAM_API_BASE_URL}/diagram`,
     {
       method: isUpdate ? 'PUT' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
       body: JSON.stringify({
         nodes: payload.nodes,
         edges: payload.edges,
       }),
     },
   );
+
+  if (response.status === 401 || response.status === 403) {
+    handleUnauthorized();
+    throw new Error('Authentication required');
+  }
 
   if (!response.ok) {
     throw new Error(isUpdate ? 'Failed to update diagram' : 'Failed to create diagram');

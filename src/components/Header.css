@@ -172,3 +172,109 @@
 .btn-templates {
   border-color: color-mix(in srgb, var(--theme-primary) 28%, var(--theme-border));
 }
+
+/* ─── Auth UI ──────────────────────────────────────────────────────────────── */
+
+.auth-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auth-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--theme-primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+  cursor: default;
+  user-select: none;
+}
+
+.btn-signin {
+  border-radius: 12px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--theme-primary);
+  color: #ffffff;
+  border: 1px solid color-mix(in srgb, var(--theme-primary) 60%, transparent);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--theme-primary) 22%, transparent);
+  transition: filter 150ms, transform 150ms;
+}
+
+.btn-signin:hover {
+  filter: brightness(1.1);
+}
+
+.btn-signin:active {
+  transform: scale(0.97);
+}
+
+.btn-logout {
+  font-size: 12px;
+  padding: 7px 12px;
+  color: var(--theme-header-muted);
+}
+
+/* ─── Collaborator Avatars ─────────────────────────────────────────────────── */
+
+.collaborator-avatars {
+  display: flex;
+  align-items: center;
+  gap: -6px; /* negative gap for overlap effect */
+}
+
+.collaborator-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--theme-header-bg);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: default;
+  user-select: none;
+  margin-left: -6px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  transition: transform 120ms ease-out;
+}
+
+.collaborator-avatar:first-child {
+  margin-left: 0;
+}
+
+.collaborator-avatar:hover {
+  transform: translateY(-2px);
+  z-index: 1;
+}
+
+.collaborator-overflow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--theme-header-bg);
+  background: color-mix(in srgb, var(--theme-surface) 80%, transparent);
+  color: var(--theme-header-muted);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: default;
+  user-select: none;
+  margin-left: -6px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
