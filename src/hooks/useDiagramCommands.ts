@@ -3,6 +3,7 @@ import type { Node } from 'reactflow';
 import { clearAutosavedDiagram } from '../app/services/diagramPersistence';
 import type { AlignmentDirection, AppState, ClipboardPayload } from '../types';
 import type { AppNodeType, NodeData } from '../nodes/types';
+import type { EdgeStylePartial } from '../edges/types';
 import useDiagramStore from '../store/useDiagramStore';
 import useHistoryStore from '../store/useHistoryStore';
 import useUIStore from '../store/useUIStore';
@@ -28,6 +29,8 @@ export type DiagramCommands = {
   updateNodeType: (nodeId: string, type: AppNodeType) => void;
   updateNodeColor: (nodeId: string, color: string | null) => void;
   updateEdgeData: (edgeId: string, label: string) => void;
+  updateEdgeStyle: (edgeId: string, style: EdgeStylePartial) => void;
+  toggleNodeLock: (nodeId: string) => void;
   alignNodes: (nodeIds: string[], direction: AlignmentDirection) => void;
 };
 
@@ -59,12 +62,16 @@ function createDiagramCommands(): DiagramCommands {
       const diagramStore = useDiagramStore.getState();
       const { selectedNodeIds, selectedEdgeIds } = uiStore;
 
-      if (selectedNodeIds.length === 0 && selectedEdgeIds.length === 0) {
+      // Skip locked nodes — they are protected from deletion
+      const nodesMap = new Map(diagramStore.nodes.map((n) => [n.id, n]));
+      const deletableNodeIds = selectedNodeIds.filter((id) => !nodesMap.get(id)?.data?.locked);
+
+      if (deletableNodeIds.length === 0 && selectedEdgeIds.length === 0) {
         return;
       }
 
       useHistoryStore.getState().pushSnapshot(diagramStore.createSnapshot());
-      diagramStore.deleteNodesAndEdges(selectedNodeIds, selectedEdgeIds);
+      diagramStore.deleteNodesAndEdges(deletableNodeIds, selectedEdgeIds);
       uiStore.clearSelection();
     },
 
@@ -224,13 +231,27 @@ function createDiagramCommands(): DiagramCommands {
       useDiagramStore.getState().updateEdgeData(edgeId, label);
     },
 
+    updateEdgeStyle: (edgeId, style) => {
+      useHistoryStore.getState().pushSnapshot(useDiagramStore.getState().createSnapshot());
+      useDiagramStore.getState().updateEdgeStyle(edgeId, style);
+    },
+
+    toggleNodeLock: (nodeId) => {
+      useHistoryStore.getState().pushSnapshot(useDiagramStore.getState().createSnapshot());
+      useDiagramStore.getState().toggleNodeLock(nodeId);
+    },
+
     alignNodes: (nodeIds, direction) => {
-      if (nodeIds.length < 2) {
+      // Skip locked nodes from alignment
+      const nodesMap = new Map(useDiagramStore.getState().nodes.map((n) => [n.id, n]));
+      const unlocked = nodeIds.filter((id) => !nodesMap.get(id)?.data?.locked);
+
+      if (unlocked.length < 2) {
         return;
       }
 
       useHistoryStore.getState().pushSnapshot(useDiagramStore.getState().createSnapshot());
-      useDiagramStore.getState().alignNodes(nodeIds, direction);
+      useDiagramStore.getState().alignNodes(unlocked, direction);
     },
   };
 }

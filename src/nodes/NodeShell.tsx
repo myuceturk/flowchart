@@ -103,6 +103,15 @@ const NodeShell: React.FC<NodeShellProps> = ({
           ))}
 
           <ResizeHandles nodeId={id} nodeType={nodeType} data={nodeData} selected={selected} />
+
+          {nodeData.locked && (
+            <div className="node-lock-badge" aria-label="Locked">
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                <rect x="1" y="5.5" width="10" height="6" rx="1.2" />
+                <path d="M3.5 5.5V3.5a2.5 2.5 0 0 1 5 0v2" />
+              </svg>
+            </div>
+          )}
         </>
       }
     >

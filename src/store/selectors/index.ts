@@ -99,3 +99,41 @@ export function useContextMenuNodeType(nodeId: string | null | undefined) {
     ),
   );
 }
+
+/**
+ * Returns the `locked` flag of a single node, or false.
+ *
+ * Used by ContextMenu to show Lock / Unlock without subscribing to the
+ * full nodes array.
+ */
+export function useContextMenuNodeLocked(nodeId: string | null | undefined) {
+  return useDiagramStore(
+    useCallback(
+      (state) => (nodeId ? (getNodesMap(state.nodes).get(nodeId)?.data?.locked ?? false) : false),
+      [nodeId],
+    ),
+  );
+}
+
+/**
+ * Returns the full Node object for the given id, or undefined.
+ *
+ * Uses the module-level Map cache so lookups are O(1) per call without
+ * iterating the nodes array on every hover event.
+ */
+export function selectNodeById(id: string) {
+  return (state: { nodes: Node[] }) => getNodesMap(state.nodes).get(id);
+}
+
+/**
+ * Hook wrapper for selectNodeById — subscribes to the diagram store and
+ * returns the node for the given id, or undefined when not found.
+ */
+export function useNodeById(nodeId: string | null | undefined) {
+  return useDiagramStore(
+    useCallback(
+      (state) => (nodeId ? getNodesMap(state.nodes).get(nodeId) : undefined),
+      [nodeId],
+    ),
+  );
+}

@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { getPluginDefaultNodeData, usePluginNodeRegistry } from '../plugins/pluginSystem';
 import type { AppNodeType } from '../nodes/types';
 import { useDiagramCommands } from '../hooks/useDiagramCommands';
-import { useContextMenuNodeType } from '../store/selectors';
+import { useContextMenuNodeType, useContextMenuNodeLocked } from '../store/selectors';
 import useUIStore from '../store/useUIStore';
 import './ContextMenu.css';
 
@@ -28,6 +28,7 @@ const ContextMenu: React.FC = () => {
   // nodes array — so ContextMenu does not re-render on unrelated updates.
   const nodeId = contextMenu.open && contextMenu.target === 'node' ? contextMenu.nodeId : null;
   const currentNodeType = useContextMenuNodeType(nodeId);
+  const isNodeLocked = useContextMenuNodeLocked(nodeId);
   const {
     duplicateSelection,
     deleteSelection,
@@ -35,6 +36,7 @@ const ContextMenu: React.FC = () => {
     addNode,
     updateNodeType,
     updateNodeColor,
+    toggleNodeLock,
   } = useDiagramCommands();
   const registry = usePluginNodeRegistry();
   const ref = useRef<HTMLDivElement | null>(null);
@@ -88,6 +90,12 @@ const ContextMenu: React.FC = () => {
     closeContextMenu();
   }, [nodeId, setSelectedNodeIds, deleteSelection, closeContextMenu]);
 
+  const handleToggleLock = useCallback(() => {
+    if (!nodeId) return;
+    toggleNodeLock(nodeId);
+    closeContextMenu();
+  }, [nodeId, toggleNodeLock, closeContextMenu]);
+
   const handleTypeChange = useCallback(
     (type: AppNodeType) => {
       if (!nodeId) return;
@@ -136,25 +144,34 @@ const ContextMenu: React.FC = () => {
       ref={ref}
       className="context-menu"
       style={{ left: contextMenu.x, top: contextMenu.y }}
+      role="menu"
+      aria-label={contextMenu.target === 'node' ? 'Node actions' : 'Canvas actions'}
     >
       {contextMenu.target === 'node' && nodeId ? (
         <>
-          <button type="button" className="context-menu__item" onClick={handleDuplicate}>
+          <button type="button" role="menuitem" className="context-menu__item" onClick={handleToggleLock}>
+            {isNodeLocked ? '🔓 Unlock' : '🔒 Lock'}
+          </button>
+          <button type="button" role="menuitem" className="context-menu__item" onClick={handleDuplicate}>
             Duplicate
           </button>
-          <button type="button" className="context-menu__item context-menu__item--danger" onClick={handleDelete}>
-            Delete
-          </button>
-          <div className="context-menu__section-label">Change type</div>
+          {!isNodeLocked && (
+            <button type="button" role="menuitem" className="context-menu__item context-menu__item--danger" onClick={handleDelete}>
+              Delete
+            </button>
+          )}
+          <div className="context-menu__section-label" role="separator">Change type</div>
           {registrySections.map((section) => (
             <React.Fragment key={section.title}>
-              <div className="context-menu__section-label">{section.title}</div>
+              <div className="context-menu__section-label" role="separator">{section.title}</div>
               <div className="context-menu__row">
                 {section.nodes.map((type) => (
                   <button
                     key={type.value}
                     type="button"
+                    role="menuitem"
                     className={`context-menu__chip ${currentNodeType === type.value ? 'is-active' : ''}`}
+                    aria-pressed={currentNodeType === type.value}
                     onClick={() => handleTypeChange(type.value)}
                   >
                     {type.label}
@@ -163,15 +180,17 @@ const ContextMenu: React.FC = () => {
               </div>
             </React.Fragment>
           ))}
-          <div className="context-menu__section-label">Change color</div>
+          <div className="context-menu__section-label" role="separator">Change color</div>
           <div className="context-menu__row">
             {COLORS.map((color) => (
               <button
                 key={color.name}
                 type="button"
+                role="menuitem"
                 className="context-menu__color"
                 style={{ background: color.value ?? 'linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%)' }}
                 onClick={() => handleColorChange(color.value)}
+                aria-label={`Set node color: ${color.name}`}
                 title={color.name}
               />
             ))}
@@ -179,17 +198,18 @@ const ContextMenu: React.FC = () => {
         </>
       ) : (
         <>
-          <button type="button" className="context-menu__item" onClick={handlePaste}>
+          <button type="button" role="menuitem" className="context-menu__item" onClick={handlePaste}>
             Paste
           </button>
           {registrySections.map((section) => (
             <React.Fragment key={section.title}>
-              <div className="context-menu__section-label">Add {section.title}</div>
+              <div className="context-menu__section-label" role="separator">Add {section.title}</div>
               <div className="context-menu__row">
                 {section.nodes.map((type) => (
                   <button
                     key={type.value}
                     type="button"
+                    role="menuitem"
                     className="context-menu__chip"
                     onClick={() => handleAddNode(type.value)}
                   >

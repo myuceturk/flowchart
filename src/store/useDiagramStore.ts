@@ -87,6 +87,12 @@ const useDiagramStore = create<DiagramStore>()((set, get) => ({
     const sourceNode = nodes.find((node) => node.id === params.source);
     const sourceColor = sourceNode?.data?.color ?? null;
 
+    // Reject connection if either endpoint is locked
+    const targetNode = nodes.find((node) => node.id === params.target);
+    if (sourceNode?.data?.locked || targetNode?.data?.locked) {
+      return false;
+    }
+
     if (sourceNode?.type === 'decision') {
       const decisionOutgoingEdges = edges.filter(
         (edge) => edge.source === params.source && isDecisionSourceHandle(edge.sourceHandle),
@@ -239,6 +245,32 @@ const useDiagramStore = create<DiagramStore>()((set, get) => ({
         edge.id === edgeId ? { ...edge, data: { ...edge.data, label } } : edge,
       ),
     });
+  },
+
+  updateEdgeStyle: (edgeId, style) => {
+    set({
+      edges: get().edges.map((edge) =>
+        edge.id === edgeId ? { ...edge, data: { ...edge.data, ...style } } : edge,
+      ),
+    });
+  },
+
+  toggleNodeLock: (nodeId) => {
+    const nodes = get().nodes;
+    const index = nodes.findIndex((n) => n.id === nodeId);
+    if (index === -1) return;
+
+    const node = nodes[index];
+    const locked = !node.data.locked;
+    const nextNodes = [...nodes];
+    nextNodes[index] = {
+      ...node,
+      draggable: !locked,
+      connectable: !locked,
+      deletable: !locked,
+      data: { ...node.data, locked },
+    };
+    set({ nodes: nextNodes });
   },
 
   deleteNodesAndEdges: (nodeIds, edgeIds) => {

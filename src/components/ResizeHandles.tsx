@@ -202,7 +202,7 @@ const ResizeHandles: React.FC<ResizeHandlesProps> = ({ nodeId, nodeType, data, s
     [beginNodeResize, data.height, data.width, data.aspectRatio, getNode, nodeId],
   );
 
-  if (!selected) {
+  if (!selected || data.locked) {
     return null;
   }
 

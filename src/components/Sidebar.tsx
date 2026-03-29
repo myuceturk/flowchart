@@ -285,8 +285,12 @@ const Sidebar: React.FC = () => {
         </div>
 
         <div className="sidebar-shell__body sidebar-scroll">
-          <section className="sidebar-section">
-            {!sidebarCollapsed ? <div className="sidebar-section__title">Core Tools</div> : null}
+          <section className="sidebar-section" aria-label="Core Tools">
+            {!sidebarCollapsed ? (
+              <div className="sidebar-section__title" role="heading" aria-level={3}>
+                Core Tools
+              </div>
+            ) : null}
             <div className="sidebar-section__items">
               {coreTools.map((item) => (
                 <ConnectedSidebarItem
@@ -303,8 +307,12 @@ const Sidebar: React.FC = () => {
           </section>
 
           {pluginSidebarItems.length > 0 ? (
-            <section className="sidebar-section">
-              {!sidebarCollapsed ? <div className="sidebar-section__title">Plugins</div> : null}
+            <section className="sidebar-section" aria-label="Plugins">
+              {!sidebarCollapsed ? (
+                <div className="sidebar-section__title" role="heading" aria-level={3}>
+                  Plugins
+                </div>
+              ) : null}
               <div className="sidebar-section__items">
                 {pluginSidebarItems.map((item) => (
                   <ConnectedSidebarItem

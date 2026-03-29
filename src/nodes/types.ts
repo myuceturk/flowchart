@@ -39,6 +39,12 @@ export interface NodeData {
   minWidth?: number;
   minHeight?: number;
   aspectRatio?: number;
+  // Image node specific fields
+  imageUrl?: string;
+  imageAlt?: string;
+  aspectRatioLocked?: boolean;
+  // Lock feature
+  locked?: boolean;
 }
 
 export type CustomNodeProps = NodeProps<NodeData>;

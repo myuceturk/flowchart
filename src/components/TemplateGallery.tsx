@@ -24,6 +24,9 @@ const categoryIcons: Record<string, string> = {
   software: '\u{1F4BB}',
   hr: '\u{1F465}',
   blank: '\u2B1C',
+  'business-process': '\u{1F4CB}',
+  technical: '\u2699\uFE0F',
+  product: '\u{1F680}',
 };
 
 // React.memo prevents re-rendering when the parent re-renders due to search/category
@@ -200,7 +203,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ open, onClose }) => {
       ref={overlayRef}
       role="dialog"
       aria-modal="true"
-      aria-label="Template Gallery"
+      aria-labelledby="tg-dialog-title"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -210,7 +213,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ open, onClose }) => {
         <div className="tg-header">
           <div className="tg-header__left">
             <div>
-              <h2 className="tg-title">Choose a Template</h2>
+              <h2 id="tg-dialog-title" className="tg-title">Choose a Template</h2>
               <p className="tg-subtitle">Start with a pre-built flow or begin from scratch.</p>
             </div>
             <div className="tg-search">
@@ -263,7 +266,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ open, onClose }) => {
           </nav>
 
           {/* Grid */}
-          <div className="tg-grid" role="list">
+          <div className="tg-grid" role="group" aria-label="Available templates">
             {filtered.length === 0 ? (
               <div className="tg-empty">
                 <p className="tg-empty__text">No templates found for &ldquo;{searchQuery}&rdquo;</p>
@@ -283,23 +286,25 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ open, onClose }) => {
                 <div
                   key={template.id}
                   className="tg-card"
-                  role="listitem"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${template.name} şablonunu seç`}
                   onClick={() => handleSelect(template)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleSelect(template);
+                    }
+                  }}
                 >
                   <MiniPreview template={template} />
                   <div className="tg-card__info">
                     <h3 className="tg-card__name">{template.name}</h3>
                     <p className="tg-card__desc">{template.description}</p>
                   </div>
-                  <button
-                    className="tg-btn tg-btn--use"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSelect(template);
-                    }}
-                  >
+                  <span className="tg-btn tg-btn--use" aria-hidden="true">
                     Use this template
-                  </button>
+                  </span>
                 </div>
               ))
             )}

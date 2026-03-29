@@ -39,7 +39,7 @@ const SidebarCategory: React.FC<SidebarCategoryProps> = ({
   }
 
   return (
-    <section className={`sidebar-category ${isOpen ? 'is-open' : ''}`}>
+    <section className={`sidebar-category ${isOpen ? 'is-open' : ''}`} aria-label={title}>
       <button
         type="button"
         className="sidebar-category__trigger"
@@ -49,8 +49,16 @@ const SidebarCategory: React.FC<SidebarCategoryProps> = ({
         title={collapsed ? title : undefined}
       >
         <span className="sidebar-category__title-wrap">
-          <span className="sidebar-category__icon">{icon}</span>
-          {!collapsed ? <span className="sidebar-category__title">{title}</span> : null}
+          <span className="sidebar-category__icon" aria-hidden="true">{icon}</span>
+          {!collapsed ? (
+            <span
+              className="sidebar-category__title"
+              role="heading"
+              aria-level={3}
+            >
+              {title}
+            </span>
+          ) : null}
         </span>
         {!collapsed ? (
           <span className="sidebar-category__chevron" aria-hidden="true">

@@ -150,6 +150,31 @@ async function captureCanvas(nodes: Node[]): Promise<string> {
     });
   }
 
+  // Pre-fetch cross-origin images as base64 so html-to-image can inline them.
+  // Images already using data: URLs (drag & drop uploads) are skipped.
+  const imgEls = flowContainer.querySelectorAll<HTMLImageElement>('.image-node__img');
+  const origSrcs: Array<{ el: HTMLImageElement; src: string }> = [];
+  await Promise.allSettled(
+    Array.from(imgEls).map(async (img) => {
+      if (!img.src || img.src.startsWith('data:')) return;
+      try {
+        const res = await fetch(img.src, { mode: 'cors', cache: 'force-cache' });
+        const blob = await res.blob();
+        return new Promise<void>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            origSrcs.push({ el: img, src: img.src });
+            img.src = e.target?.result as string;
+            resolve();
+          };
+          reader.readAsDataURL(blob);
+        });
+      } catch {
+        // If CORS fails, leave the src as-is; html-to-image will do its best.
+      }
+    }),
+  );
+
   try {
     const dataUrl = await toPng(flowContainer, {
       backgroundColor: '#ffffff',
@@ -164,6 +189,10 @@ async function captureCanvas(nodes: Node[]): Promise<string> {
     });
     return dataUrl;
   } finally {
+    // Restore original cross-origin src values
+    for (const { el, src } of origSrcs) {
+      el.src = src;
+    }
     // ── Restore everything ──
     viewport.style.transform = origViewportTransform;
     flowContainer.style.width = origContainerWidth;
@@ -205,6 +234,202 @@ export async function exportToPdf(nodes: Node[]): Promise<void> {
   pdf.addImage(dataUrl, 'PNG', 0, 0, bounds.width, bounds.height);
   pdf.save(`diagram-${getTimestamp()}.pdf`);
 }
+
+// ─── SVG Export ─────────────────────────────────────────────────────────────
+
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function getNodeHandlePos(
+  node: Node,
+  handleId: string | null | undefined,
+  role: 'source' | 'target',
+): { x: number; y: number } {
+  const w = node.width ?? 180;
+  const h = node.height ?? 60;
+  const { x, y } = node.position;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+
+  switch (handleId) {
+    case 'top':
+    case 'decision-top':
+      return { x: cx, y };
+    case 'bottom':
+      return { x: cx, y: y + h };
+    case 'left':
+    case 'decision-left':
+      return { x, y: cy };
+    case 'right':
+      return { x: x + w, y: cy };
+    case 'decision-yes':
+      return { x: x + w, y: cy };
+    case 'decision-no':
+      return { x: cx, y: y + h };
+    default:
+      return role === 'source' ? { x: cx, y: y + h } : { x: cx, y };
+  }
+}
+
+function buildBezierPath(
+  sx: number,
+  sy: number,
+  tx: number,
+  ty: number,
+): string {
+  const dy = Math.abs(ty - sy);
+  const offset = Math.max(dy * 0.4, 40);
+  return `M ${sx} ${sy} C ${sx} ${sy + offset} ${tx} ${ty - offset} ${tx} ${ty}`;
+}
+
+function renderNodeSvg(node: Node, offsetX: number, offsetY: number): string {
+  const w = node.width ?? 180;
+  const h = node.height ?? 60;
+  const x = node.position.x - offsetX;
+  const y = node.position.y - offsetY;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+
+  const fill = (node.data as { color?: string | null } | undefined)?.color ?? '#ffffff';
+  const stroke = '#64748b';
+  const sw = 1.5;
+  const label: string =
+    (node.data as { label?: string } | undefined)?.label ?? '';
+  const type = node.type ?? 'process';
+
+  let shape = '';
+  if (type === 'decision') {
+    const pts = `${cx},${y} ${x + w},${cy} ${cx},${y + h} ${x},${cy}`;
+    shape = `<polygon points="${pts}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
+  } else if (type === 'startEnd') {
+    shape = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${h / 2}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
+  } else if (type === 'inputOutput') {
+    const sk = 12;
+    const pts = `${x + sk},${y} ${x + w},${y} ${x + w - sk},${y + h} ${x},${y + h}`;
+    shape = `<polygon points="${pts}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
+  } else if (type === 'stickyNote') {
+    const noteFill = fill !== '#ffffff' ? fill : '#fef9c3';
+    shape = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${noteFill}" stroke="${stroke}" stroke-width="${sw}"/>`;
+  } else if (type === 'text') {
+    shape = '';
+  } else {
+    shape = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
+  }
+
+  if (!label) return `<g>${shape}</g>`;
+
+  const fontSize = 13;
+  const lineH = fontSize * 1.4;
+  const rawLines = label.split('\n');
+  const textStartY = cy - ((rawLines.length - 1) * lineH) / 2;
+  const tspans = rawLines
+    .map(
+      (ln, i) =>
+        `<tspan x="${cx}" ${i === 0 ? `y="${textStartY}"` : `dy="${lineH}"`}>${escapeXml(ln)}</tspan>`,
+    )
+    .join('');
+  const textEl = `<text text-anchor="middle" dominant-baseline="middle" font-family="system-ui,-apple-system,sans-serif" font-size="${fontSize}" fill="#1e293b">${tspans}</text>`;
+
+  return `<g>${shape}${textEl}</g>`;
+}
+
+function renderArrowMarker(color: string, id: string): string {
+  return `<marker id="${id}" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+  <polygon points="0 0, 10 3.5, 0 7" fill="${color}"/>
+</marker>`;
+}
+
+function renderEdgeSvg(
+  edge: Edge,
+  nodeMap: Map<string, Node>,
+  offsetX: number,
+  offsetY: number,
+): string {
+  const source = nodeMap.get(edge.source);
+  const target = nodeMap.get(edge.target);
+  if (!source || !target) return '';
+
+  const sp = getNodeHandlePos(source, edge.sourceHandle, 'source');
+  const tp = getNodeHandlePos(target, edge.targetHandle, 'target');
+  const sx = sp.x - offsetX;
+  const sy = sp.y - offsetY;
+  const tx = tp.x - offsetX;
+  const ty = tp.y - offsetY;
+
+  const edgeData = edge.data as
+    | { sourceColor?: string | null; label?: string; lineType?: string }
+    | undefined;
+  const color = edgeData?.sourceColor ?? '#64748b';
+  const markerId = `arrow-${edge.id.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  const pathD = buildBezierPath(sx, sy, tx, ty);
+  const dashArray =
+    edgeData?.lineType === 'dashed'
+      ? 'stroke-dasharray="6 3"'
+      : edgeData?.lineType === 'dotted'
+        ? 'stroke-dasharray="2 3"'
+        : '';
+
+  const defs = `<defs>${renderArrowMarker(color, markerId)}</defs>`;
+  const path = `<path d="${pathD}" fill="none" stroke="${color}" stroke-width="1.5" ${dashArray} marker-end="url(#${markerId})"/>`;
+
+  const label = edgeData?.label;
+  const midX = (sx + tx) / 2;
+  const midY = (sy + ty) / 2;
+  const labelEl = label
+    ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#475569" paint-order="stroke" stroke="#ffffff" stroke-width="3">${escapeXml(label)}</text>`
+    : '';
+
+  return `<g>${defs}${path}${labelEl}</g>`;
+}
+
+export function exportAsSVG(nodes: Node[], edges: Edge[]): void {
+  if (nodes.length === 0) return;
+
+  const bounds = getDiagramBounds(nodes);
+  const offsetX = bounds.x;
+  const offsetY = bounds.y;
+
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+
+  const edgeSvgs = edges.map((e) => renderEdgeSvg(e, nodeMap, offsetX, offsetY)).join('\n');
+  const nodeSvgs = nodes.map((n) => renderNodeSvg(n, offsetX, offsetY)).join('\n');
+
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${bounds.width}" height="${bounds.height}" viewBox="0 0 ${bounds.width} ${bounds.height}">
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <g class="edges">${edgeSvgs}</g>
+  <g class="nodes">${nodeSvgs}</g>
+</svg>`;
+
+  const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.download = `diagram-${getTimestamp()}.svg`;
+  link.href = url;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── Embed Code ──────────────────────────────────────────────────────────────
+
+export function generateEmbedCode(diagramId: string): string {
+  return `<iframe
+  src="http://localhost:5173/embed/${diagramId}"
+  width="800"
+  height="600"
+  frameborder="0"
+  title="Embedded Diagram"
+  style="border:1px solid #e2e8f0;border-radius:8px;"
+></iframe>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function exportToJson(nodes: Node[], edges: Edge[]): void {
   const data = JSON.stringify({ nodes, edges }, null, 2);

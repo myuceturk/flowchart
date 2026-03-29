@@ -76,7 +76,13 @@ const Header: React.FC = () => {
       </div>
       <div className="header-actions">
         {hasNodes ? (
-          <div className={`save-status ${isSaving ? 'saving' : 'saved'}`} key={`${isSaving}`}>
+          <div
+            className={`save-status ${isSaving ? 'saving' : 'saved'}`}
+            key={`${isSaving}`}
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
             {isSaving ? 'Saving...' : 'Draft Saved'}
           </div>
         ) : null}
@@ -85,6 +91,11 @@ const Header: React.FC = () => {
           <button
             className="btn-history btn-theme"
             onClick={handleThemeToggle}
+            aria-label={
+              preference === 'system'
+                ? `Using system theme (${mode}). Click to override.`
+                : `Switch to ${mode === 'dark' ? 'light' : 'dark'} mode`
+            }
             title={
               preference === 'system'
                 ? `Using system theme (${mode}). Click to override.`
@@ -109,17 +120,19 @@ const Header: React.FC = () => {
             className="btn-history"
             onClick={undoCommand}
             disabled={pastLength === 0}
+            aria-label="Undo (Ctrl+Z)"
             title="Undo (Ctrl+Z)"
           >
-            <span className="icon">↩</span> Undo
+            <span className="icon" aria-hidden="true">↩</span> Undo
           </button>
           <button
             className="btn-history"
             onClick={redoCommand}
             disabled={futureLength === 0}
+            aria-label="Redo (Ctrl+Y)"
             title="Redo (Ctrl+Y)"
           >
-            Redo <span className="icon">↪</span>
+            Redo <span className="icon" aria-hidden="true">↪</span>
           </button>
         </div>
 
@@ -128,6 +141,7 @@ const Header: React.FC = () => {
         <button
           className="btn-history btn-templates"
           onClick={handleOpenGallery}
+          aria-label="Browse templates"
           title="Browse templates"
         >
           <span className="icon" aria-hidden="true">
@@ -145,6 +159,7 @@ const Header: React.FC = () => {
         <button
           className="btn-clear"
           onClick={clearCanvasCommand}
+          aria-label="Clear all nodes and edges"
           title="Clear all nodes and edges"
         >
           Clear Canvas
@@ -153,7 +168,12 @@ const Header: React.FC = () => {
         <div className="divider" />
 
         {diagramId ? <span className="diagram-id-label">ID: {diagramId}</span> : null}
-        <button className="btn-save" onClick={handleSave} disabled={isManualSaving}>
+        <button
+          className="btn-save"
+          onClick={handleSave}
+          disabled={isManualSaving}
+          aria-label={isManualSaving ? 'Updating diagram…' : 'Save diagram to cloud'}
+        >
           {isManualSaving ? 'Updating...' : 'Save Cloud'}
         </button>
 

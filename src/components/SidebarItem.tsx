@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useId, useState } from 'react';
 
 type SidebarItemTone = 'blue' | 'purple' | 'orange' | 'green' | 'gray';
 
@@ -33,6 +33,9 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
   onDragStart,
   onDragEnd,
 }) => {
+  const descId = useId();
+  const [isGrabbed, setIsGrabbed] = useState(false);
+
   const className = [
     'sidebar-item',
     `sidebar-item--${tone}`,
@@ -44,23 +47,37 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
     .filter(Boolean)
     .join(' ');
 
+  const handleDragStart = (e: React.DragEvent<HTMLButtonElement>) => {
+    setIsGrabbed(true);
+    onDragStart?.(e);
+  };
+
+  const handleDragEnd = () => {
+    setIsGrabbed(false);
+    onDragEnd?.();
+  };
+
   return (
     <button
       type="button"
       className={className}
       onClick={onClick}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       draggable={draggable && !disabled}
       disabled={disabled}
       aria-label={label}
+      aria-grabbed={draggable ? isGrabbed : undefined}
+      aria-describedby={description ? descId : undefined}
     >
       <span className="sidebar-item__indicator" aria-hidden="true" />
-      <span className="sidebar-item__icon">{icon}</span>
+      <span className="sidebar-item__icon" aria-hidden="true">{icon}</span>
       {!collapsed && (
         <>
           <span className="sidebar-item__label">{label}</span>
-          {description ? <span className="sidebar-item__description">{description}</span> : null}
+          {description ? (
+            <span id={descId} className="sidebar-item__description">{description}</span>
+          ) : null}
         </>
       )}
       {!collapsed && (indicator || disabled) ? (

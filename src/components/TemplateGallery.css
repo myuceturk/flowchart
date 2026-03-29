@@ -85,7 +85,7 @@
   opacity: 0.7;
 }
 
-.tg-search__input:focus {
+.tg-search__input:focus-visible {
   border-color: color-mix(in srgb, var(--theme-primary, #2563eb) 50%, var(--theme-border, rgba(148, 163, 184, 0.24)));
 }
 

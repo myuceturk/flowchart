@@ -792,3 +792,233 @@
 .resize-handle--nw { top: 0; left: 0; cursor: nwse-resize; }
 .resize-handle--se { bottom: 0; right: 0; cursor: nwse-resize; }
 .resize-handle--sw { bottom: 0; left: 0; cursor: nesw-resize; }
+
+/* ── Image Node ─────────────────────────────────────────────── */
+
+.node-card--image {
+  padding: 0;
+  overflow: hidden;
+}
+
+.node-card--image .node-shell__body {
+  padding: 0;
+  gap: 0;
+}
+
+.node-card--image .node-shell__icon {
+  display: none;
+}
+
+/* Upload placeholder */
+.image-node__upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  min-height: 80px;
+  padding: 12px;
+  cursor: pointer;
+  border-radius: inherit;
+  transition: background-color 0.15s ease;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.image-node__upload:hover {
+  background: color-mix(in srgb, var(--node-icon, #16a34a) 6%, transparent);
+}
+
+.image-node__upload--drag {
+  background: color-mix(in srgb, var(--node-icon, #16a34a) 12%, transparent);
+  outline: 2px dashed var(--node-icon, #16a34a);
+  outline-offset: -4px;
+}
+
+.image-node__upload-icon {
+  width: 28px;
+  height: 28px;
+  color: var(--node-icon, #16a34a);
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.image-node__upload-hint {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--node-label-color, #374151);
+  opacity: 0.7;
+  text-align: center;
+  pointer-events: none;
+  user-select: none;
+}
+
+.image-node__url-btn {
+  margin-top: 2px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 999px;
+  border: 1px solid var(--node-icon, #16a34a);
+  color: var(--node-icon, #16a34a);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.image-node__url-btn:hover {
+  background: color-mix(in srgb, var(--node-icon, #16a34a) 10%, transparent);
+}
+
+.image-node__url-row {
+  width: 100%;
+  padding: 0 4px;
+  box-sizing: border-box;
+}
+
+.image-node__url-input {
+  width: 100%;
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--node-icon, #16a34a);
+  outline: none;
+  background: var(--theme-surface, #fff);
+  color: var(--theme-text, #0f172a);
+  box-sizing: border-box;
+}
+
+/* Preview */
+.image-node__preview {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.image-node__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: inherit;
+  user-select: none;
+}
+
+.image-node__img--hidden {
+  visibility: hidden;
+}
+
+/* Skeleton shimmer */
+.image-node__skeleton {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--node-border, #86efac) 40%, transparent) 25%,
+    color-mix(in srgb, var(--node-border, #86efac) 70%, transparent) 50%,
+    color-mix(in srgb, var(--node-border, #86efac) 40%, transparent) 75%
+  );
+  background-size: 200% 100%;
+  animation: image-node-shimmer 1.4s infinite linear;
+}
+
+@keyframes image-node-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image-node__skeleton {
+    animation: none;
+    background: color-mix(in srgb, var(--node-border, #86efac) 50%, transparent);
+  }
+}
+
+.image-node__caption {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 100%);
+  text-align: center;
+  pointer-events: none;
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+  user-select: none;
+}
+
+/* Error fallback */
+.image-node__fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  min-height: 80px;
+  padding: 12px;
+  color: var(--node-label-color, #374151);
+  opacity: 0.7;
+  box-sizing: border-box;
+}
+
+.image-node__fallback-text {
+  font-size: 11px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.image-node__fallback-btn {
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.9;
+}
+
+.image-node__fallback-btn:hover {
+  opacity: 1;
+}
+
+/* .toolbar-btn--active is defined in ContextToolbar.css (shared) */
+
+/* ── Node lock badge ──────────────────────────────────────────── */
+
+.node-lock-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--node-icon, #2563eb) 18%, transparent);
+  color: var(--node-icon, #2563eb);
+  pointer-events: none;
+  z-index: 4;
+  opacity: 0.85;
+}
+
+.node-lock-badge svg {
+  width: 10px;
+  height: 10px;
+}

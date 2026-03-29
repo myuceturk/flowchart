@@ -1,6 +1,7 @@
 import type { Connection, Edge, EdgeChange, Node, NodeChange } from 'reactflow';
 import type { SpacingIndicator } from '../utils/alignment';
 import type { AppNodeType, NodeData } from '../nodes/types';
+import type { EdgeStylePartial } from '../edges/types';
 
 export type AlignmentDirection =
   | 'left'
@@ -44,6 +45,9 @@ export interface DiagramStore {
   updateNodeType: (nodeId: string, type: AppNodeType) => void;
 
   updateEdgeData: (edgeId: string, label: string) => void;
+  updateEdgeStyle: (edgeId: string, style: EdgeStylePartial) => void;
+
+  toggleNodeLock: (nodeId: string) => void;
 
   deleteNodesAndEdges: (nodeIds: string[], edgeIds: string[]) => void;
 

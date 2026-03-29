@@ -4,7 +4,6 @@ import {
   BackgroundVariant,
   ConnectionMode,
   Controls,
-  MiniMap,
   Panel,
   ReactFlow,
   useReactFlow,
@@ -32,6 +31,7 @@ import EmptyState from '../EmptyState';
 import NodeSearch from '../NodeSearch';
 import SelectionToolbar from '../SelectionToolbar';
 import AlignmentGuides from './components/AlignmentGuides';
+import SmartMiniMap from './components/SmartMiniMap';
 import { useCanvasContextMenu } from './hooks/useCanvasContextMenu';
 import { useCanvasKeyboardShortcuts } from './hooks/useCanvasKeyboardShortcuts';
 import { useCanvasNodeDnD } from './hooks/useCanvasNodeDnD';
@@ -131,13 +131,17 @@ const CanvasView: React.FC = () => {
   const nudgeSelectedNodes = useCallback(
     (dx: number, dy: number) => {
       const currentSelectedNodeIds = useUIStore.getState().selectedNodeIds;
+      if (currentSelectedNodeIds.length === 0) return;
 
-      if (currentSelectedNodeIds.length === 0) {
-        return;
-      }
+      // Skip locked nodes — they cannot be moved
+      const allNodes = useDiagramStore.getState().nodes;
+      const movableIds = currentSelectedNodeIds.filter(
+        (id) => !allNodes.find((n) => n.id === id)?.data?.locked,
+      );
+      if (movableIds.length === 0) return;
 
       takeSnapshot();
-      useDiagramStore.getState().nudgeNodes(currentSelectedNodeIds, dx, dy);
+      useDiagramStore.getState().nudgeNodes(movableIds, dx, dy);
     },
     [takeSnapshot],
   );
@@ -234,10 +238,23 @@ const CanvasView: React.FC = () => {
     });
   }, [edges, fitView, nodes, setDiagram, takeSnapshot]);
 
+  const selectionCount = selectedNodeIds.length;
+
   return (
     <>
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {selectionCount > 0
+          ? `${selectionCount} node${selectionCount === 1 ? '' : 's'} selected`
+          : ''}
+      </div>
       <ReactFlow
         className={isPanMode ? 'canvas canvas--hand-tool' : 'canvas'}
+        aria-label="Diagram canvas, interactive"
         nodes={nodes}
         edges={edges}
         nodeTypes={pluginNodeTypes}
@@ -273,14 +290,7 @@ const CanvasView: React.FC = () => {
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color={customTheme.grid} />
         <Controls />
-        <MiniMap
-          position="bottom-right"
-          nodeColor={miniMapNodeColor}
-          maskColor="rgba(0, 0, 0, 0.1)"
-          className="custom-minimap"
-          zoomable
-          pannable
-        />
+        <SmartMiniMap nodeColor={miniMapNodeColor} />
         <Panel position="top-right" className="canvas-toolbar">
           <button type="button" className="canvas-toolbar__button" onClick={handleAutoLayout}>
             Auto Layout
