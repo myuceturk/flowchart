@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from 'react';
+import * as Sentry from '@sentry/react';
 import { ReactFlowProvider } from 'reactflow';
 import { useShallow } from 'zustand/react/shallow';
 import Canvas from './components/Canvas';
@@ -6,6 +7,7 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import TemplateGallery from './components/TemplateGallery';
 import AuthModal from './components/AuthModal';
+import ErrorFallback from './components/ErrorFallback';
 import { useAutoSave } from './hooks/useAutoSave';
 import { useDiagramBootstrap } from './app/hooks/useDiagramBootstrap';
 import { animationCssVariables } from './utils/animations';
@@ -96,4 +98,24 @@ function App() {
   );
 }
 
-export default App;
+function AppWithErrorBoundary() {
+  const { user } = useAuthStore((s) => ({ user: s.user }));
+
+  return (
+    <Sentry.ErrorBoundary
+      fallback={({ error, componentStack, eventId }) => (
+        <ErrorFallback error={error as Error} componentStack={componentStack ?? undefined} eventId={eventId ?? undefined} />
+      )}
+      beforeCapture={(scope) => {
+        if (user) {
+          // Only set a non-identifying user id — no email or PII
+          scope.setUser({ id: user.id });
+        }
+      }}
+    >
+      <App />
+    </Sentry.ErrorBoundary>
+  );
+}
+
+export default AppWithErrorBoundary;

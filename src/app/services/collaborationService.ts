@@ -8,7 +8,9 @@
  *   collaborationService.disconnect();
  */
 
-const WS_URL = 'ws://localhost:3001/ws';
+import { WS_URL as _WS_BASE } from '../../config';
+
+const WS_URL = `${_WS_BASE}/ws`;
 const MAX_RECONNECT_ATTEMPTS = 3;
 
 export interface CollabMessage {

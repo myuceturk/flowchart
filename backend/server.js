@@ -1,27 +1,116 @@
+require('dotenv').config();
+
 const http = require('http');
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const pinoHttp = require('pino-http');
 const { v4: uuidv4 } = require('uuid');
-const { getDiagram, saveDiagram, updateDiagram, deleteDiagram, listDiagrams } = require('./db');
+const logger = require('./logger');
+const { db, getDiagram, saveDiagram, updateDiagram, deleteDiagram, listDiagrams } = require('./db');
 const { authMiddleware, register, login, me } = require('./auth');
 const { setup: setupWs } = require('./ws');
+const { generalLimiter, authLimiter, diagramSaveLimiter } = require('./middleware/rateLimiter');
+const {
+  validateRegister,
+  validateLogin,
+  validateDiagramCreate,
+  validateDiagramUpdate,
+  validateDiagramId,
+} = require('./middleware/validators');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT ?? 3001;
+const isProd = process.env.NODE_ENV === 'production';
 
-app.use(cors());
-app.use(express.json());
+if (isProd) {
+  app.disable('x-powered-by');
+}
+
+// ─── Security headers (Helmet) ────────────────────────────────────────────────
+
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        'connect-src': ["'self'", 'ws:', 'wss:'],
+      },
+    },
+  }),
+);
+
+// ─── CORS ─────────────────────────────────────────────────────────────────────
+
+const allowedOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:5173')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. curl, server-to-server)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      callback(new Error(`CORS: origin '${origin}' not allowed`));
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  }),
+);
+
+// ─── Request logging middleware ───────────────────────────────────────────────
+
+app.use(
+  pinoHttp({
+    logger,
+    customSuccessMessage: (req, res) => `${req.method} ${req.url} ${res.statusCode}`,
+    customErrorMessage: (req, res, err) => `${req.method} ${req.url} ${res.statusCode} - ${err.message}`,
+    customAttributeKeys: { responseTime: 'responseTime' },
+    serializers: {
+      req: (req) => ({ method: req.method, url: req.url }),
+      res: (res) => ({ statusCode: res.statusCode }),
+    },
+  }),
+);
+
+// ─── Body parsing (2 MB limit for large diagrams) ────────────────────────────
+
+app.use(express.json({ limit: '2mb' }));
+
+// ─── General rate limit (all routes) ─────────────────────────────────────────
+
+app.use(generalLimiter);
 
 // Attach req.user on every request (soft — never rejects)
 app.use(authMiddleware);
 
 // ─── Auth routes ──────────────────────────────────────────────────────────────
 
-app.post('/auth/register', register);
-app.post('/auth/login', login);
+app.post('/auth/register', authLimiter, validateRegister, register);
+app.post('/auth/login', authLimiter, validateLogin, login);
 app.get('/auth/me', me);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
+
+app.get('/health', (_req, res) => {
+  let dbStatus = 'connected';
+  try {
+    db.prepare('SELECT 1').get();
+  } catch {
+    dbStatus = 'error';
+  }
+
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: Date.now(),
+    version: process.env.npm_package_version,
+    db: dbStatus,
+  });
+});
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Diagram Node.js SQLite Backend Running.' });
@@ -44,35 +133,35 @@ function canAccess(diagram, req) {
 // ─── Diagram routes ───────────────────────────────────────────────────────────
 
 // POST /diagram — create a new diagram
-app.post('/diagram', (req, res) => {
+app.post('/diagram', diagramSaveLimiter, validateDiagramCreate, (req, res) => {
   try {
     const { nodes = [], edges = [], title = '' } = req.body;
     const id = uuidv4();
     const userId = req.user?.id ?? null;
     const diagram = saveDiagram(id, title, { nodes, edges }, userId);
-    console.log(`Created diagram: ${id}`);
+    logger.info({ diagramId: id }, 'Created diagram');
     res.status(201).json({ id: diagram.id, ...diagram.data });
   } catch (err) {
-    console.error('POST /diagram error:', err);
+    logger.error({ err }, 'POST /diagram error');
     res.status(500).json({ error: 'Failed to create diagram' });
   }
 });
 
 // GET /diagram/:id — retrieve a diagram
-app.get('/diagram/:id', (req, res) => {
+app.get('/diagram/:id', validateDiagramId, (req, res) => {
   try {
     const diagram = getDiagram(req.params.id);
     if (!diagram) return res.status(404).json({ error: 'Diagram not found' });
     if (!canAccess(diagram, req)) return res.status(403).json({ error: 'Access denied' });
     res.status(200).json({ id: diagram.id, ...diagram.data });
   } catch (err) {
-    console.error('GET /diagram/:id error:', err);
+    logger.error({ err }, 'GET /diagram/:id error');
     res.status(500).json({ error: 'Failed to retrieve diagram' });
   }
 });
 
 // PUT /diagram/:id — update an existing diagram
-app.put('/diagram/:id', (req, res) => {
+app.put('/diagram/:id', diagramSaveLimiter, validateDiagramUpdate, (req, res) => {
   try {
     const existing = getDiagram(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Diagram not found' });
@@ -89,26 +178,26 @@ app.put('/diagram/:id', (req, res) => {
     }
 
     const diagram = updateDiagram(req.params.id, changes);
-    console.log(`Updated diagram: ${req.params.id}`);
+    logger.info({ diagramId: req.params.id }, 'Updated diagram');
     res.status(200).json({ id: diagram.id, ...diagram.data });
   } catch (err) {
-    console.error('PUT /diagram/:id error:', err);
+    logger.error({ err }, 'PUT /diagram/:id error');
     res.status(500).json({ error: 'Failed to update diagram' });
   }
 });
 
 // DELETE /diagram/:id — delete a diagram
-app.delete('/diagram/:id', (req, res) => {
+app.delete('/diagram/:id', validateDiagramId, (req, res) => {
   try {
     const diagram = getDiagram(req.params.id);
     if (!diagram) return res.status(404).json({ error: 'Diagram not found' });
     if (!canAccess(diagram, req)) return res.status(403).json({ error: 'Access denied' });
 
     deleteDiagram(req.params.id);
-    console.log(`Deleted diagram: ${req.params.id}`);
+    logger.info({ diagramId: req.params.id }, 'Deleted diagram');
     res.status(200).json({ message: 'Diagram deleted' });
   } catch (err) {
-    console.error('DELETE /diagram/:id error:', err);
+    logger.error({ err }, 'DELETE /diagram/:id error');
     res.status(500).json({ error: 'Failed to delete diagram' });
   }
 });
@@ -127,14 +216,25 @@ app.get('/diagrams', (req, res) => {
       })),
     );
   } catch (err) {
-    console.error('GET /diagrams error:', err);
+    logger.error({ err }, 'GET /diagrams error');
     res.status(500).json({ error: 'Failed to list diagrams' });
   }
+});
+
+// ─── Global error handlers ────────────────────────────────────────────────────
+
+process.on('unhandledRejection', (reason) => {
+  logger.error({ reason }, 'Unhandled promise rejection');
+});
+
+process.on('uncaughtException', (err) => {
+  logger.error({ err }, 'Uncaught exception — shutting down');
+  process.exit(1);
 });
 
 const server = http.createServer(app);
 setupWs(server);
 
 server.listen(PORT, () => {
-  console.log(`Server started on http://localhost:${PORT}`);
+  logger.info({ port: PORT }, 'Server started');
 });

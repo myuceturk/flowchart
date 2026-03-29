@@ -1,7 +1,8 @@
 import { create } from 'zustand';
+import { API_URL } from '../config';
 
 const AUTH_TOKEN_KEY = 'fdb_auth_token';
-const API_BASE = 'http://localhost:3001';
+const API_BASE = API_URL;
 
 export interface AuthUser {
   id: string;

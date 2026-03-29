@@ -1,9 +1,10 @@
 import type { Edge, Node } from 'reactflow';
 import type { NodeData } from '../../nodes/types';
+import { API_URL } from '../../config';
 
 export const DIAGRAM_AUTOSAVE_STORAGE_KEY = 'flow-diagram-autosave';
 
-const DIAGRAM_API_BASE_URL = 'http://localhost:3001';
+const DIAGRAM_API_BASE_URL = API_URL;
 
 export type DiagramPayload = {
   id?: string;
